@@ -3,18 +3,56 @@
 
 #include <CL/cl.h>
 #include <vector>
+#include <stdint.h>
+#include "vtypes.h"
+#include "geometry.h"
 #include "debug.h"
 
-typedef struct {
+class DeviceContext
+{
 	cl_device_id cldevice;
 	cl_context clcontext;
 	cl_command_queue clqueue;
 	cl_program rtprogram;
 	cl_kernel rtkernel;
-} device_context;
+	
+	// Sphere data
+	bool spheres_allocated;
+	cl_mem sphere_centers_dev;
+	cl_mem sphere_radi_dev;
+	int n_spheres;
+	
+	// Triangle data
+	bool triangles_allocated;
+	cl_mem triangles_dev;
+	int n_triangles;
+	
+	public:
+	DeviceContext( unsigned device );
+	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
+	void updateSpheres( std::vector<Sphere_struct>& spheres );
+	void updateTriangles( std::vector<Triangle_struct>& triangles );
+};
+
+class RTContext
+{
+	std::vector<DeviceContext> devices;
+	std::vector<Geometry> geometry;
+	float3 eye;
+	float2 angles;
+	void updateDevices( void );
+	public:
+	RTContext( void );
+	unsigned registerDeviceContext( DeviceContext dcontext );
+	int addGeometry( Geometry g ){ geometry.push_back( g ); return geometry.size(); };
+	void* trace( unsigned width, unsigned height );
+	void step( float mod );
+	void strafe( float mod );
+	void mouse( int x, int y );
+	
+};
 
 int clinit( void );
-device_context create_clcontext( unsigned device );
 
 /*! \brief Performs a binary read of the given file
  *

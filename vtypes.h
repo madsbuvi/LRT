@@ -4,8 +4,12 @@
 /* float2 functions */
 /******************************************************************************/
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 typedef struct{ float x; float y; } float2;
-typedef struct{ float x; float y; float z; } float3;
+typedef struct{ float x; float y; float z; float dummy; } float3;
 typedef struct{ float x; float y; float z; float w; } float4;
 typedef struct{ int x; int y; } int2;
 typedef struct{ int x; int y; int z; } int3;
