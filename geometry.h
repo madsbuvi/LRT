@@ -28,7 +28,7 @@ typedef struct {
 } AAB_struct;
 
 typedef struct {
-	float3 bmin, bmax, s1;
+	float3 s1, s2, s3;
 	float h;
 } Box_struct;
 
@@ -90,7 +90,7 @@ class Box: public Primitive
 {
 	public:
 	Box_struct s;
-	Box( float3 bmin, float3 bmax, float3 s1, float h ){ s.bmin = bmin; s.bmax = bmax; s.s1 = s1; s.h = h; type = Box_t; };
+	Box( float3 s1, float3 s2, float3 s3, float h ){ s.s1 = s1; s.s2 = s2; s.s3 = s3; s.h = h; type = Box_t; };
 };
 
 class Pyramid: public Geometry
@@ -99,11 +99,12 @@ class Pyramid: public Geometry
 	Pyramid( float3 v1, float3 v2, float3 v3, float3 v4, float3 apex );
 };
 
+
 Geometry make_sphere( float3 c, float r );
 Geometry make_triangle( float3 v1, float3 v2, float3 v3 );
 Geometry make_rectangle( float3 bmin, float3 s1, float3 s2 );
 Geometry make_quadrilateral( float3 v1, float3 v2, float3 v3, float3 v4 );
 Geometry make_AAB( float3 bmin, float3 bmax );
-Geometry make_box( float3 bmin, float3 bmax, float3 s1, float h );
+Geometry make_box( float3 s1, float3 s2, float3 s3, float h );
 
 #endif

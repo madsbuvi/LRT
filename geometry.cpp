@@ -47,9 +47,9 @@ Geometry make_AAB( float3 bmin, float3 bmax )
 	return g;
 }
 
-Geometry make_box( float3 bmin, float3 bmax, float3 s1, float h )
+Geometry make_box( float3 s1, float3 s2, float3 s3, float h )
 {
-	Box* p = new Box( bmin, bmax, s1, h );
+	Box* p = new Box( s1, s2, s3, h );
 	Geometry g( p );
 	return g;
 }

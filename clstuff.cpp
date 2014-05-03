@@ -316,9 +316,9 @@ void DeviceContext::updateBoxes( std::vector<Box_struct>& boxes)
 		
 		for( int i = 0; i < n_boxes; i++ )
 		{
-			array[ i*3 ] = boxes[i].bmin;
-			array[ i*3+1 ] = boxes[i].bmax;
-			array[ i*3+2 ] = boxes[i].s1;
+			array[ i*3 ] = boxes[i].s1;
+			array[ i*3+1 ] = boxes[i].s2;
+			array[ i*3+2 ] = boxes[i].s3;
 			heights[ i ] = boxes[i].h;
 		}
 		HandleErrorRet(
