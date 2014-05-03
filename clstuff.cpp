@@ -4,6 +4,14 @@
 
 static std::vector<cl_device_id> device_vector;
 
+
+/*! \brief good old malloc for opencl
+ *
+ *	\param[in] context A context
+ *	\param[in] size	How much to allocate
+ *	\return A cl_mem object if successful, 0 otherwise.
+ */
+#define cl_malloc(context, size) cl_malloc_(context, size, __LINE__, __FILE__)
 cl_mem cl_malloc_(cl_context context, size_t size, int line, const  char *file){
 	cl_mem memory_object;
 
@@ -15,14 +23,6 @@ cl_mem cl_malloc_(cl_context context, size_t size, int line, const  char *file){
 	}
 	return memory_object;
 }
-
-/*! \brief good old malloc for opencl
- *
- *	\param[in] context A context
- *	\param[in] size	How much to allocate
- *	\return A cl_mem object if successful, 0 otherwise.
- */
-#define cl_malloc(context, size) cl_malloc_(context, size, __LINE__, __FILE__)
 
 int clinit( void )
 {
@@ -85,6 +85,8 @@ DeviceContext::DeviceContext( unsigned device )
 	
 	spheres_allocated = false;
 	triangles_allocated = false;
+	boxes_allocated = false;
+	geometry_allocated = false;
 }
 
 
@@ -94,6 +96,9 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	cl_mem devmem = cl_malloc( clcontext, width*height*sizeof(*output) );
 
 	
+	float3 light = { -100.f, -25.f, -100.f };
+	
+	// Why can't i hold all these kernel arguments
 	HandleErrorRet( clSetKernelArg( rtkernel, 0, sizeof(U), &U) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 1, sizeof(V), &V) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 2, sizeof(W), &W) );
@@ -104,6 +109,13 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	HandleErrorRet( clSetKernelArg( rtkernel, 7, sizeof(int), &n_spheres) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 8, sizeof(cl_mem), &triangles_dev) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 9, sizeof(int), &n_triangles) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 10, sizeof(cl_mem), &boxes_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 11, sizeof(cl_mem), &box_heights_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 12, sizeof(int), &n_boxes) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 13, sizeof(cl_mem), &geometry_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 14, sizeof(cl_mem), &primitives_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 15, sizeof(int), &n_geo) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 16, sizeof(light), &light) );
 	size_t global[] = {width, height};
 	size_t local[] = {16, 16};
 	
@@ -135,6 +147,22 @@ unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
 	return devices.size();
 }
 
+/*
+ *	Calculate pinhole camera vectors.
+ *	eye  - the position of the camera
+ *	lookat - what the camera is looking at (view direction of the center of our view will be towards this, with focus length equal to | lookat - eye |
+ *	up - The direction up from the eye. Should be orthogonal to ( lookat - eye )
+ *  Hfov - an angle defining the horizontal field of view. The vertical field of view becomes hfov/aspect_ratio
+ *  Aspect_ratio - width/height (resolution)
+ *  W - Vector from eye to lookat
+ *  U - Vector, orthogonal to both up and W, defining the "vertical" sides of the picture ( lookat + U = lefthand side )
+ *	V - Vector, orthogonal to U and W, and parallel to up ( if up is orthogonal to W ), defining the top/botton of the picture ( lookat + V = the bottom of the screen )
+ *
+ *	If the picture buffer you want to fill does not start with ( 0, 0 ) in the bottom left corner of the picture, take the negative(s) of U and/or V.
+ *	In this project the buffer starts with ( 0, 0 ) at the top left corner of the picture, therefore I use the negative of V.
+ *	To creature the lookat argument, I pass ( eye + direction * focus_length ). Where direction is created by spheric coordinates.
+ *	To create the up argument, i once again just use spheric coordinates, but subtract M_PI/2 from the relevant angle.
+ */
 static void calculateCameraVariables( float3 eye,
 									float3 lookat,
 									float3 up,
@@ -258,6 +286,114 @@ void DeviceContext::updateTriangles( std::vector<Triangle_struct>& triangles )
 	}
 }
 
+void DeviceContext::updateBoxes( std::vector<Box_struct>& boxes)
+{
+	if( boxes_allocated )
+	{
+		HandleErrorRet(
+			clReleaseMemObject( boxes_dev )
+		);
+		HandleErrorRet(
+			clReleaseMemObject( box_heights_dev )
+		);
+	}
+	
+	n_boxes = boxes.size();
+	
+	if( n_boxes )
+	{
+		boxes_dev = cl_malloc( clcontext, n_boxes * 3 * sizeof( float3 ) );
+		box_heights_dev = cl_malloc( clcontext, n_boxes * sizeof( float ) );
+		boxes_allocated = true;
+		float3* array;
+		float* heights;
+		HandleErrorPar(
+			array = (float3*)clEnqueueMapBuffer( clqueue, boxes_dev, true, CL_MAP_WRITE, 0, n_boxes * 3 * sizeof( float3 ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		HandleErrorPar(
+			heights = (float*)clEnqueueMapBuffer( clqueue, box_heights_dev, true, CL_MAP_WRITE, 0, n_boxes * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		
+		for( int i = 0; i < n_boxes; i++ )
+		{
+			array[ i*3 ] = boxes[i].bmin;
+			array[ i*3+1 ] = boxes[i].bmax;
+			array[ i*3+2 ] = boxes[i].s1;
+			heights[ i ] = boxes[i].h;
+		}
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, boxes_dev, (void*)array, 0, NULL, NULL )
+		);
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, box_heights_dev, (void*)heights, 0, NULL, NULL )
+		);
+		
+	}
+	else
+	{
+		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
+		boxes_dev = cl_malloc( clcontext, 128 );
+		box_heights_dev = cl_malloc( clcontext, 128 );
+		boxes_allocated = true;
+	}
+}
+
+void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<int> primitives )
+{
+	if( geometry_allocated )
+	{
+		HandleErrorRet(
+			clReleaseMemObject( geometry_dev )
+		);
+		HandleErrorRet(
+			clReleaseMemObject( primitives_dev )
+		);
+	}
+	
+	n_geo = gd.size();
+	int n_prim = primitives.size();
+	if( n_geo && n_prim )
+	{
+		geometry_dev = cl_malloc( clcontext, n_geo * 2 * sizeof( int ) );
+		primitives_dev = cl_malloc( clcontext, n_prim * sizeof( int ) );
+		geometry_allocated = true;
+		int* geo;
+		int* prim;
+		HandleErrorPar(
+			geo= (int*)clEnqueueMapBuffer( clqueue, geometry_dev, true, CL_MAP_WRITE, 0, n_geo * 2 * sizeof( int ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		HandleErrorPar(
+			prim = (int*)clEnqueueMapBuffer( clqueue, primitives_dev, true, CL_MAP_WRITE, 0, n_prim * sizeof( int ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		
+		for( int i = 0; i < n_geo; i++ )
+		{
+			geo[ i*2 ] = gd[i].primindex;
+			geo[ i*2 + 1 ] = gd[i].nprim;
+		}
+		
+		for( int i = 0; i < n_prim; i++ )
+		{
+			prim[ i ] = primitives[ i ];
+		}
+		
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, geometry_dev, (void*)geo, 0, NULL, NULL )
+		);
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, primitives_dev, (void*)prim, 0, NULL, NULL )
+		);
+		
+	}
+	else
+	{
+		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
+		geometry_dev = cl_malloc( clcontext, 128 );
+		primitives_dev = cl_malloc( clcontext, 128 );
+		geometry_allocated = true;
+	}
+}
+
 void RTContext::updateDevices( void )
 {
 	std::vector<Sphere_struct> spheres;
@@ -266,37 +402,59 @@ void RTContext::updateDevices( void )
 	std::vector<Quadrilateral_struct> quads;
 	std::vector<AAB_struct> AABs;
 	std::vector<Box_struct> boxes;
+	std::vector<Geometrydata> gd;
+	std::vector<int> primitives;
 	
 	for( Geometry geo: geometry )
 	{
+		Geometrydata data;
+		data.primindex = gd.size();
+		data.nprim = geo.getPrimitives()->size();
 		for( Primitive* p: *geo.getPrimitives() )
 		{
 			switch( p->getType() )
 			{
 				case Sphere_t:
 					spheres.push_back( static_cast<Sphere*>(p)->s );
+					primitives.push_back( 0 );
+					primitives.push_back( spheres.size() - 1 );
 					break;
 				case Triangle_t:
 					triangles.push_back( static_cast<Triangle*>(p)->s );
+					primitives.push_back( 1 );
+					primitives.push_back( triangles.size() - 1 );
 					break;
 				case Rectangle_t:
 					rectangles.push_back( static_cast<Rectangle*>(p)->s );
+					primitives.push_back( 2 );
+					primitives.push_back( rectangles.size() - 1 );
 					break;
 				case Quadrilateral_t:
 					quads.push_back( static_cast<Quadrilateral*>(p)->s );
+					primitives.push_back( 3 );
+					primitives.push_back( quads.size() - 1 );
 					break;
 				case AAB_t:
 					AABs.push_back( static_cast<AAB*>(p)->s );
+					primitives.push_back( 4 );
+					primitives.push_back( AABs.size() - 1 );
 					break;
 				case Box_t:
 					boxes.push_back( static_cast<Box*>(p)->s );
+					primitives.push_back( 5 );
+					primitives.push_back( boxes.size() - 1 );
 					break;
 			}
 		}
+		
+		gd.push_back( data );
 	}
+	
 	
 	devices[0].updateSpheres( spheres );
 	devices[0].updateTriangles( triangles );
+	devices[0].updateBoxes( boxes );
+	devices[0].updateGeometry( gd, primitives );
 }
 
 void* RTContext::trace( unsigned width, unsigned height )
@@ -316,7 +474,7 @@ void* RTContext::trace( unsigned width, unsigned height )
 	
 	if(devices.size()){
 		updateDevices();
-		return devices[0].trace( width, height, U, V, W, eye );
+		return devices[0].trace( width, height, U, -V, W, eye );
 	}
 	dprintf( 1, "Attempted to trace without a device to trace on!\n" );
 	return NULL;
@@ -338,7 +496,7 @@ void RTContext::strafe( float mod )
 void RTContext::mouse( int x, int y )
 {
 	angles.x += 0.01f * static_cast<float>(x);
-	angles.y -= 0.01f * static_cast<float>(y);
+	angles.y += 0.01f * static_cast<float>(y);
 }
 
 const char* readFile(const char *filename, size_t *len)

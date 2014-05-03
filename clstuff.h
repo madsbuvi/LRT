@@ -8,6 +8,14 @@
 #include "geometry.h"
 #include "debug.h"
 
+struct Geometrydata
+{
+	int primindex;
+	int nprim;
+	int shaderindex;
+	int shadertype;
+};
+
 class DeviceContext
 {
 	cl_device_id cldevice;
@@ -27,11 +35,25 @@ class DeviceContext
 	cl_mem triangles_dev;
 	int n_triangles;
 	
+	// Triangle data
+	bool boxes_allocated;
+	cl_mem boxes_dev;
+	cl_mem box_heights_dev;
+	int n_boxes;
+	
+	// Geometry data
+	bool geometry_allocated;
+	cl_mem geometry_dev;
+	cl_mem primitives_dev;
+	int n_geo;
+	
 	public:
 	DeviceContext( unsigned device );
 	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
 	void updateSpheres( std::vector<Sphere_struct>& spheres );
 	void updateTriangles( std::vector<Triangle_struct>& triangles );
+	void updateBoxes( std::vector<Box_struct>& boxes );
+	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int> primitives );
 };
 
 class RTContext

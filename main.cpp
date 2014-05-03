@@ -41,9 +41,8 @@ int main(int argc, char *argv[])
 	context->addGeometry( make_sphere( make_float3( 8.f, -10.f, 9.f ), 1.f ) );
 	
 	
-	context->addGeometry( make_triangle( make_float3( -4.f, -5.f, 4.f ), make_float3( -4.f, -5.f, 6.f ), make_float3( -2.f, -6.f, 3.f ) ) );
-	context->addGeometry( make_triangle( make_float3( -4.f, -5.f, 4.f ), make_float3( -4.f, -5.f, 6.f ), make_float3( -6.f, -6.f, 3.f ) ) );
-	
+	context->addGeometry( make_box( make_float3( -4.f, 5.f, 4.f ), make_float3( -6.f, 5.f, 4.f ), make_float3( -4.f, 5.f, 2.f ), 1 ) );
+
 	running = true;
 	while( running ){
 		control->actions( );

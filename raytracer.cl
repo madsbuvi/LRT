@@ -2,6 +2,16 @@
 #define RT_DEFAULT_MIN 0.001
 #define RT_DEFAULT_MAX 10000.
 #define MISS make_float4( 0.f, 0.f, 0.f, RT_DEFAULT_MAX +1.f )
+
+#define printg3(a) if( gid() == 0 )printf( #a ": %g, %g, %g\n", a.x, a.y, a.z );
+#define printg(a) if( gid() == 0 )printf( #a ": %g\n", a );
+#define printi(a) if( gid() == 0 )printf( #a ": %d\n", a );
+#define printu(a) if( gid() == 0 )printf( #a ": %u\n", a );
+#define printg3all(a) printf( #a ": %g, %g, %g\n", a.x, a.y, a.z );
+#define printgall(a) printf( #a ": %g\n", a );
+#define printiall(a) printf( #a ": %d\n", a );
+#define printuall(a) printf( #a ": %u\n", a );
+
 static inline unsigned gid( void )
 {
 	return get_global_id(1) * get_global_size(0) + get_global_id(0);
@@ -37,7 +47,7 @@ typedef struct {
 } AAB;
 
 typedef struct {
-	float3 bmin, bmax, s1;
+	float3 v1, v2, v3;
 	float h;
 } Box;
 
@@ -162,15 +172,19 @@ static float4 intersect_box( Ray ray, Box box )
 {
 	// Simple Axis Aligned Box intersection
 	float n1, n2, n3, f1, f2, f3;
-	float3 v1, v2, v3, v4, v5, v6, v7, v8;
-	v1 = box.bmin;
-	v2 = box.bmin + box.s1;
-	v8 = box.bmax;
-	v7 = box.bmax - box.s1;
-	v3 = v7 - make_float3( 0.f, box.h, 0.f );
-	//v4 = v8 - make_float3( 0.f, box.h, 0.f );
-	//v5 = v1 + make_float3( 0.f, box.h, 0.f );
-	v6 = v2 + make_float3( 0.f, box.h, 0.f );
+	float3 v1, v2, v3, v4, base_normal, v5, v6, v7, v8;
+	v1 = box.v1;
+	v2 = box.v2;
+	v3 = box.v3;
+	v4 = v3 + v2 - v1;
+	
+	
+	base_normal = normalize( cross( v1 - v2, v3 - v1 ) );
+	
+	v5 = v1 + box.h * base_normal;
+	v6 = v2 + box.h * base_normal;
+	v7 = v3 + box.h * base_normal;
+	v8 = v4 + box.h * base_normal;
 	
 	n1 = intersect_plane( ray, v1, v2, v3 );
 	n2 = intersect_plane( ray, v1, v2, v6 );
@@ -215,6 +229,7 @@ static float4 intersect_box( Ray ray, Box box )
 		return extend_float3( normalize( cross( v1- v3, v1 - v7 ) ), t_near );
 	}
 }
+
 
 // Sphere buils down to a simple quadratic euqation
 static float4 intersect_sphere( Ray ray, float3 center, float radius )
@@ -340,14 +355,51 @@ static float4 intersect_triangle( Ray ray, float3 v1, float3 v2, float3 v3 )
 	return extend_float3( n, r );
 }
 
+float3 faceforward(const float3 n, const float3 i)
+{
+  if( dot ( n, i ) < 0.f )
+	return n;
+  else
+	return -n;
+}
 
+static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t )
+{
+	float3 hit_point = ray.origin + ray.direction * t;
+	normal = faceforward( normal, ray.direction );
+	// Diffuse lighting based on rotation relative to light source
+	float diffuseFactor = max( dot( normalize( normal ),
+											normalize( light_pos - hit_point ) )
+								, 0.0f );
+	float3 totallight = diffuseFactor * 0.5f + make_float3(0.5f, 0.5f, 0.5f);
+	float3 result = make_float3( 0.f, 1.f, 0.f ) * totallight;
+
+	
+	return result;
+}
+
+
+
+/* Raytracer kernel.
+ *
+ * Has an ungodly number of parameters because opencl does not have any proper way of ensuring consistency in layout of
+ * structures between host and device, so to ensure portability i can only use very basic types. So every struct becomes a set of arrays.
+ */
 __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint* picture,
+	
+	/* All our basic primitives, which will serve to build all other shapes */
 	/* Sphere parameters */
 	__global float3* sphere_centers, __global float* sphere_radi, int nspheres,
 	/* Triangle parameters */
-	__global float3* triangles, int ntriangles
+	__global float3* triangles, int ntriangles,
 	/* Box parameters */
+	__global float3* boxes, __global float* box_heights, int nboxes,
 	
+	/* Geometry */
+	__global int* geometry, __global int* primitives, int nobjects,
+	
+	/* Shader stuff */
+	float3 light_pos
 	)
 {
 	// CAMERA
@@ -357,7 +409,7 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	float3 ray_origin = eye;
 	float3 ray_direction = normalize(d.x*U + d.y*V + W);
 	/*
-	if( fabs(ray_direction.x) < RT_MIN_ANGLE) ray_direction.x = RT_MIN_ANGLE;
+	if( fabs(ray_direction.x) < RT_MIN_ANGLE ) ray_direction.x = RT_MIN_ANGLE;
 	if( fabs(ray_direction.y) < RT_MIN_ANGLE ) ray_direction.y = RT_MIN_ANGLE;
 	if( fabs(ray_direction.z) < RT_MIN_ANGLE ) ray_direction.z = RT_MIN_ANGLE;
 	*/
@@ -368,41 +420,53 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	
 	float4 closest = MISS;
 	float4 nyligst;
+	//printi( nobjects );
 	
-	nyligst = intersect_sphere( ray, make_float3(0.f, 0.f, -1.5f), .5f );
-	if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
-	
-	nyligst = intersect_AABB( ray, make_float3(1.f, 0.f, -0.5f), make_float3(2.f, 1.f, 0.5f) );
-	if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
-	
-	nyligst = intersect_triangle( ray, make_float3(-1.f, 0.f, 0.f), make_float3(-2.f, 1.f, 0.f), make_float3( -1.5f, 1.f, 1.f ) );
-	if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
-	
-	Box testbox = {
-		make_float3( 2.f, 2.f, 2.f ),
-		make_float3( 2.f, 4.f, 6.f ),
-		make_float3( 2.f, 0.f, 2.f ),
-		2.f
-	};
-	
-	nyligst = intersect_box( ray, testbox );
-	if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
+	for( int i = 0; i < nobjects; i++ )
+	{
+		__global int* p = &primitives[ geometry[ i*2 ] * 2 ];
+		int nprim = geometry[ i*2 + 1];
+		for( int j = 0; j < nprim; j++ )
+		{
+			int type = p[ j*2 ];
+			int index = p[ j*2 + 1 ];
+			
+			
+			switch( type )
+			{
+				case 0:
+					
+					Sphere sphere = { sphere_centers[index], sphere_radi[index] };
+					nyligst = intersect_sphere2(ray, sphere);
+					break;
+					
+				case 1:
+					nyligst = intersect_triangle(ray, triangles[index*3], triangles[index*3+1], triangles[index*3+2] );
+					break;
+					
+				case 5:
+					Box box = {
+						boxes[ index*3 + 0 ],
+						boxes[ index*3 + 1 ],
+						boxes[ index*3 + 2 ],
+						box_heights[ index ]
+					};
+
+					nyligst = intersect_box( ray, box );
+					break;
+			}
+			
+			if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
+			
+		}
+	}
 
 	
-	for( int i = 0; i < nspheres; i++ )
-	{
-		Sphere sphere = { sphere_centers[i], sphere_radi[i] };
-		nyligst = intersect_sphere2(ray, sphere);
-		if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
-	}
-	
-	for( int i = 0; i < ntriangles; i++ )
-	{
-		nyligst = intersect_triangle(ray, triangles[i*3], triangles[i*3+1], triangles[i*3+2] );
-		if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
-	}
-	
 	float3 result = make_float3( closest.x, closest.y, closest.z );
-	
+	if(closest.w < RT_DEFAULT_MIN || closest.w > RT_DEFAULT_MAX ) result.y = 0.f;
+	else{
+	 result = diffusion_shader( ray, light_pos, result, closest.w );
+	}
 	picture[ gid( ) ] = make_color( result );
+	
 }

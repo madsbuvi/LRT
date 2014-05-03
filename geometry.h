@@ -90,7 +90,7 @@ class Box: public Primitive
 {
 	public:
 	Box_struct s;
-	Box( float3 bmin, float3 bmax, float3 s1, float h ){ s.bmin = bmin; s.bmax = bmax; s.s1 = s1; s.h = h; };
+	Box( float3 bmin, float3 bmax, float3 s1, float h ){ s.bmin = bmin; s.bmax = bmax; s.s1 = s1; s.h = h; type = Box_t; };
 };
 
 class Pyramid: public Geometry
