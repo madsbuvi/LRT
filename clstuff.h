@@ -12,8 +12,8 @@ struct Geometrydata
 {
 	int primindex;
 	int nprim;
+	int shader;
 	int shaderindex;
-	int shadertype;
 };
 
 class DeviceContext
@@ -45,6 +45,7 @@ class DeviceContext
 	bool geometry_allocated;
 	cl_mem geometry_dev;
 	cl_mem primitives_dev;
+	cl_mem shader_data_dev;
 	int n_geo;
 	
 	public:
@@ -53,7 +54,7 @@ class DeviceContext
 	void updateSpheres( std::vector<Sphere_struct>& spheres );
 	void updateTriangles( std::vector<Triangle_struct>& triangles );
 	void updateBoxes( std::vector<Box_struct>& boxes );
-	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int> primitives );
+	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int>& primitives, std::vector<float>& shader_data );
 };
 
 class RTContext
@@ -67,6 +68,7 @@ class RTContext
 	RTContext( void );
 	unsigned registerDeviceContext( DeviceContext dcontext );
 	int addGeometry( Geometry g ){ geometry.push_back( g ); return geometry.size(); };
+	int addGeometry( Geometry g, Shader* shader ){ g.setShader( shader ); geometry.push_back( g ); return geometry.size(); };
 	void* trace( unsigned width, unsigned height );
 	void step( float mod );
 	void strafe( float mod );

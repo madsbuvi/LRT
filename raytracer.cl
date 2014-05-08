@@ -3,6 +3,8 @@
 #define RT_DEFAULT_MAX 10000.
 #define MISS make_float4( 0.f, 0.f, 0.f, RT_DEFAULT_MAX +1.f )
 
+#define SIMPLE_DIFFUSION_SHADER 0
+
 #define printg3(a) if( gid() == 0 )printf( #a ": %g, %g, %g\n", a.x, a.y, a.z );
 #define printg(a) if( gid() == 0 )printf( #a ": %g\n", a );
 #define printi(a) if( gid() == 0 )printf( #a ": %d\n", a );
@@ -101,11 +103,11 @@ static uint make_color( float3 in )
 {
 	uint color = 255u;
 	color = color << 8u;
-	color += (uint)(fabs(in.x)*255.f);
+	color += (uint)( fmin( fabs(in.x), 1.f )*255.f );
 	color = color << 8u;
-	color += (uint)(fabs(in.y)*255.f);
+	color += (uint)( fmin( fabs(in.y), 1.f )*255.f );
 	color = color << 8u;
-	color |= (uint)(fabs(in.z)*255.f);
+	color |= (uint)( fmin( fabs(in.z), 1.f )*255.f );
 	return color;
 }
 
@@ -355,7 +357,10 @@ static float4 intersect_triangle( Ray ray, float3 v1, float3 v2, float3 v3 )
 	return extend_float3( n, r );
 }
 
-float3 faceforward(const float3 n, const float3 i)
+// Returns the negative of n if i and n point in the same direction (are within 90 degrees of eachother)
+// otherwise the positive of n
+// This is useful to guarantee that a normal points OUT of the ground, without worrying about order of cross products or vertexes ktp.
+float3 faceback(const float3 n, const float3 i)
 {
   if( dot ( n, i ) < 0.f )
 	return n;
@@ -363,17 +368,56 @@ float3 faceforward(const float3 n, const float3 i)
 	return -n;
 }
 
-static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t )
+static float3 diffusion_shader_( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
 {
 	float3 hit_point = ray.origin + ray.direction * t;
-	normal = faceforward( normal, ray.direction );
+	normal = faceback( normal, ray.direction );
 	// Diffuse lighting based on rotation relative to light source
 	float diffuseFactor = max( dot( normalize( normal ),
 											normalize( light_pos - hit_point ) )
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f + make_float3(0.5f, 0.5f, 0.5f);
-	float3 result = make_float3( 0.f, 1.f, 0.f ) * totallight;
+	float3 result = make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
 
+	
+	return result;
+}
+
+// Turn into constant memory to be set from host later
+// Or #define it from host for extra performance
+
+#define ambient_effect make_float3( 1.f, 1.f, 1.f )
+#define ambient_color make_float3( 0.1f, 0.3f, 0.0f )
+#define specular_color make_float3( 0.6f, 0.6f, 0.6f )
+#define diffuse_color make_float3( 0.2f, 0.7f, 0.1f )
+#define phong_exponent 132.f
+
+static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
+{
+	float3 hit_point = ray.origin + ray.direction * t;
+	float3 light_dir = normalize( light_pos - hit_point );
+	normal = faceback( normal, ray.direction );
+	// Diffuse lighting based on rotation relative to light source
+	float diffuseFactor = max( dot( normalize( normal ),
+											light_dir )
+								, 0.0f );
+	float3 totallight = diffuseFactor * 0.5f;
+	float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
+	
+	// Add shadows here
+	
+	// Add reflection here
+	
+	// Phong specular
+	float3 h = normalize( light_dir - ray.direction );
+	float d = dot( normal, h );
+	float power;
+	if( d > 0)
+	{
+		power = pow( d, phong_exponent );
+		result += specular_color * power;
+	}
+	
 	
 	return result;
 }
@@ -399,7 +443,10 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	__global int* geometry, __global int* primitives, int nobjects,
 	
 	/* Shader stuff */
-	float3 light_pos
+	float3 light_pos,
+	
+	/* Shader data */
+	__global float* shader_data
 	)
 {
 	// CAMERA
@@ -419,13 +466,15 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	// RAY TRACING
 	
 	float4 closest = MISS;
+	int shader = 0;
+	int shader_data_index = 0;
 	float4 nyligst;
 	//printi( nobjects );
 	
 	for( int i = 0; i < nobjects; i++ )
 	{
-		__global int* p = &primitives[ geometry[ i*2 ] * 2 ];
-		int nprim = geometry[ i*2 + 1];
+		__global int* p = &primitives[ geometry[ i*4 ] * 2 ];
+		int nprim = geometry[ i*4 + 1];
 		for( int j = 0; j < nprim; j++ )
 		{
 			int type = p[ j*2 ];
@@ -456,16 +505,27 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 					break;
 			}
 			
-			if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w ) closest = nyligst;
+			if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w )
+			{
+				closest = nyligst;
+				shader = geometry[ i*4 + 2 ];
+				shader_data_index = geometry[ i*4 + 3 ];
+			}
 			
 		}
 	}
 
 	
-	float3 result = make_float3( closest.x, closest.y, closest.z );
-	if(closest.w < RT_DEFAULT_MIN || closest.w > RT_DEFAULT_MAX ) result.y = 0.f;
-	else{
-	 result = diffusion_shader( ray, light_pos, result, closest.w );
+	float3 result = make_float3( 0.f, 0.f, 0.f );
+	if(closest.w > RT_DEFAULT_MIN && closest.w < RT_DEFAULT_MAX )
+	{
+		float3 normal = make_float3( closest.x, closest.y, closest.z );
+		switch( shader )
+		{
+			case SIMPLE_DIFFUSION_SHADER:
+				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ] );
+				break;
+		}
 	}
 	picture[ gid( ) ] = make_color( result );
 	

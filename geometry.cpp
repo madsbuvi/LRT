@@ -1,4 +1,14 @@
 #include "geometry.h"
+
+Shader* Geometry::getShader( void ) {
+	if ( shader == NULL ){
+		return Shader::getDefaultShader();
+	}
+	else{
+		return shader;
+	}
+}
+
 Pyramid::Pyramid( float3 v1, float3 v2, float3 v3, float3 v4, float3 apex ){
 	Quadrilateral* base = new Quadrilateral( v1, v2, v3, v4 );
 	Triangle* s1 = new Triangle( v1, v2, apex );

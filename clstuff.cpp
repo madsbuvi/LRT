@@ -96,7 +96,7 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	cl_mem devmem = cl_malloc( clcontext, width*height*sizeof(*output) );
 
 	
-	float3 light = { -100.f, -25.f, -100.f };
+	float3 light = { -200.f, 60.f, -200.f };
 	
 	// Why can't i hold all these kernel arguments
 	HandleErrorRet( clSetKernelArg( rtkernel, 0, sizeof(U), &U) );
@@ -116,6 +116,7 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	HandleErrorRet( clSetKernelArg( rtkernel, 14, sizeof(cl_mem), &primitives_dev) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 15, sizeof(int), &n_geo) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 16, sizeof(light), &light) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 17, sizeof(cl_mem), &shader_data_dev) );
 	size_t global[] = {width, height};
 	size_t local[] = {16, 16};
 	
@@ -338,7 +339,7 @@ void DeviceContext::updateBoxes( std::vector<Box_struct>& boxes)
 	}
 }
 
-void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<int> primitives )
+void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<int>& primitives, std::vector<float>& shader_data )
 {
 	if( geometry_allocated )
 	{
@@ -348,28 +349,39 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 		HandleErrorRet(
 			clReleaseMemObject( primitives_dev )
 		);
+		HandleErrorRet(
+			clReleaseMemObject( shader_data_dev )
+		);
 	}
 	
 	n_geo = gd.size();
 	int n_prim = primitives.size();
+	int n_shader_data = shader_data.size();
 	if( n_geo && n_prim )
 	{
-		geometry_dev = cl_malloc( clcontext, n_geo * 2 * sizeof( int ) );
+		geometry_dev = cl_malloc( clcontext, n_geo * 4 * sizeof( int ) );
 		primitives_dev = cl_malloc( clcontext, n_prim * sizeof( int ) );
+		shader_data_dev = cl_malloc( clcontext, n_shader_data * sizeof( float ) );
 		geometry_allocated = true;
 		int* geo;
 		int* prim;
+		float* sd;
 		HandleErrorPar(
-			geo= (int*)clEnqueueMapBuffer( clqueue, geometry_dev, true, CL_MAP_WRITE, 0, n_geo * 2 * sizeof( int ), 0, NULL, NULL, HANDLE_ERROR )
+			geo= (int*)clEnqueueMapBuffer( clqueue, geometry_dev, true, CL_MAP_WRITE, 0, n_geo * 4 * sizeof( int ), 0, NULL, NULL, HANDLE_ERROR )
 		);
 		HandleErrorPar(
 			prim = (int*)clEnqueueMapBuffer( clqueue, primitives_dev, true, CL_MAP_WRITE, 0, n_prim * sizeof( int ), 0, NULL, NULL, HANDLE_ERROR )
 		);
+		HandleErrorPar(
+			sd = (float*)clEnqueueMapBuffer( clqueue, shader_data_dev, true, CL_MAP_WRITE, 0, n_shader_data * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
 		
 		for( int i = 0; i < n_geo; i++ )
 		{
-			geo[ i*2 ] = gd[i].primindex;
-			geo[ i*2 + 1 ] = gd[i].nprim;
+			geo[ i*4 ] = gd[i].primindex;
+			geo[ i*4 + 1 ] = gd[i].nprim;
+			geo[ i*4 + 2 ] = gd[i].shader;
+			geo[ i*4 + 3 ] = gd[i].shaderindex;
 		}
 		
 		for( int i = 0; i < n_prim; i++ )
@@ -377,11 +389,21 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 			prim[ i ] = primitives[ i ];
 		}
 		
+		for( int i = 0; i < n_shader_data; i++ )
+		{
+			sd[ i ] = shader_data[ i ];
+		}
+		
+		
+		
 		HandleErrorRet(
 			clEnqueueUnmapMemObject( clqueue, geometry_dev, (void*)geo, 0, NULL, NULL )
 		);
 		HandleErrorRet(
 			clEnqueueUnmapMemObject( clqueue, primitives_dev, (void*)prim, 0, NULL, NULL )
+		);
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, shader_data_dev, (void*)sd, 0, NULL, NULL )
 		);
 		
 	}
@@ -390,6 +412,7 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
 		geometry_dev = cl_malloc( clcontext, 128 );
 		primitives_dev = cl_malloc( clcontext, 128 );
+		shader_data_dev = cl_malloc( clcontext, 128 );
 		geometry_allocated = true;
 	}
 }
@@ -404,12 +427,17 @@ void RTContext::updateDevices( void )
 	std::vector<Box_struct> boxes;
 	std::vector<Geometrydata> gd;
 	std::vector<int> primitives;
+	std::vector<float> shader_data;
 	
 	for( Geometry geo: geometry )
 	{
 		Geometrydata data;
 		data.primindex = gd.size();
 		data.nprim = geo.getPrimitives()->size();
+		data.shader = geo.getShader()->shader;
+		data.shaderindex = shader_data.size();
+		geo.getShader()->writeShaderData(shader_data);
+		
 		for( Primitive* p: *geo.getPrimitives() )
 		{
 			switch( p->getType() )
@@ -454,7 +482,7 @@ void RTContext::updateDevices( void )
 	devices[0].updateSpheres( spheres );
 	devices[0].updateTriangles( triangles );
 	devices[0].updateBoxes( boxes );
-	devices[0].updateGeometry( gd, primitives );
+	devices[0].updateGeometry( gd, primitives, shader_data );
 }
 
 void* RTContext::trace( unsigned width, unsigned height )

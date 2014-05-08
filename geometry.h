@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "vtypes.h"
+#include "shaders.h"
 
 enum PrimitiveType { Sphere_t, Triangle_t, Rectangle_t, Quadrilateral_t, AAB_t, Box_t };
 
@@ -42,13 +43,16 @@ class Primitive
 
 class Geometry
 {
+	Shader* shader;
 	protected:
 	std::vector<Primitive*> primitives;
 	public:
-	Geometry( void ){};
-	Geometry( Primitive* p ){ primitives.push_back( p ); };
+	Geometry( void ){ shader = NULL; };
+	Geometry( Primitive* p ){ shader = NULL; primitives.push_back( p ); };
 	int addPrimitive( Primitive* p ){ primitives.push_back( p ); return primitives.size(); };
 	std::vector<Primitive*>* getPrimitives( void ){ return &primitives; };
+	void setShader( Shader* shader ){ this-> shader = shader; };
+	Shader* getShader( void );
 };
 
 class Sphere: public Primitive
