@@ -17,7 +17,7 @@
 #define printuall(a) printf( #a ": %u\n", a );
 
 
-const sampler_t smplr = CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
+const sampler_t smplr = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_MIRRORED_REPEAT | CLK_FILTER_LINEAR;
 
 
 static inline unsigned gid( void )
@@ -121,11 +121,11 @@ inline float fmaxf(const float3 a)
 static uint make_color( float3 in )
 {
 	uint color = 0;
-	color += (uint)( fmin( fabs(in.z), 1.f )*255.f );
+	color += (uint)( fmin( fabs(in.x), 1.f )*255.f );
 	color = color << 8u;
 	color += (uint)( fmin( fabs(in.y), 1.f )*255.f );
 	color = color << 8u;
-	color |= (uint)( fmin( fabs(in.x), 1.f )*255.f );
+	color |= (uint)( fmin( fabs(in.z), 1.f )*255.f );
 	color = color << 8u;
 	color += 255u;
 	return color;
@@ -407,7 +407,7 @@ static float3 diffusion_shader_( Ray ray, float3 light_pos, float3 normal, float
 // Or #define it from host for extra performance
 
 #define ambient_effect make_float3( 1.f, 1.f, 1.f )
-#define ambient_color make_float3( 0.1f, 0.1f, 0.1f )
+#define ambient_color make_float3( 0.4f, 0.4f, 0.4f )
 #define specular_color make_float3( 0.6f, 0.6f, 0.6f )
 #define diffuse_color make_float3( 0.2f, 0.7f, 0.1f )
 #define phong_exponent 132.f
@@ -423,13 +423,13 @@ static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float 
 											light_dir )
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f;
-	int2 coord = { hit_point.x*250, hit_point.z*250 };
+	//int2 coord = { hit_point.x, hit_point };
 
-	uint4 texui = read_imageui( textr, smplr, coord );
+	uint4 texui = read_imageui( textr, smplr, hit_point.xz );
 	float3 tex = make_float3( texui.x, texui.y, texui.z ) / 255.f;
 	
 	//float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
-	float3 result = ambient_effect * ambient_color + tex * totallight;
+	float3 result = ( ambient_effect * ambient_color + totallight ) * tex;
 	
 	// Add shadows here
 	
