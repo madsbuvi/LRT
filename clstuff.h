@@ -4,9 +4,31 @@
 #include <CL/cl.h>
 #include <vector>
 #include <stdint.h>
+
+
+#ifdef _WIN32
+#include <windows.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#define GLFW_EXPOSE_NATIVE_WGL
+
+#endif
+
+#include "gfx_glfw.h"
+#include <GLFW/glfw3native.h>
 #include "vtypes.h"
 #include "geometry.h"
 #include "debug.h"
+
+
+#include <GL/glew.h>
+#include <CL/cl_gl.h>
+#ifndef _WIN32
+#include <GL/glx.h>
+#endif
+
+
+
 
 struct Geometrydata
 {
@@ -49,7 +71,7 @@ class DeviceContext
 	int n_geo;
 	
 	public:
-	DeviceContext( unsigned device );
+	DeviceContext( unsigned device, GLFWwindow* window );
 	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
 	void updateSpheres( std::vector<Sphere_struct>& spheres );
 	void updateTriangles( std::vector<Triangle_struct>& triangles );

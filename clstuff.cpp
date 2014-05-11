@@ -1,8 +1,12 @@
 #include <cstdlib>
+#include <string>
+#include <iostream>
 #include <stdint.h>
 #include "clstuff.h"
-
+#include "oglstuff.h"
 static std::vector<cl_device_id> device_vector;
+
+
 
 
 /*! \brief good old malloc for opencl
@@ -44,14 +48,38 @@ int clinit( void )
 		gpu_devices += ret_num_devices;
 	}
 	
+	// Discard any and all devices that do not support opengl sharing
+	for( i = 0; i < device_vector.size(); i++ )
+	{
+		char* extensions = new char[10000];
+		size_t size;
+		clGetDeviceInfo( device_vector[i], CL_DEVICE_EXTENSIONS, 10000, extensions, &size );
+		std::string ext(extensions);
+		delete extensions;
+		if(ext.find("cl_khr_gl_sharing")==std::string::npos)
+		{
+			device_vector.erase( device_vector.begin()+i );
+		}
+	}
+	
 	dprintf( 1, "device_vector size: %d\n", device_vector.size() );
 	delete platform_ids;
-	return gpu_devices;
+	
+	device_vector.shrink_to_fit();
+	
+	return device_vector.size();
 }
 
-DeviceContext::DeviceContext( unsigned device )
+/*
+ * Note that right now my entire cl device handling is wonky because i'm only just figuring out opengl interop
+ */
+DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 {
 	cldevice = device_vector[device];
+	
+	cl_platform_id pid;
+	clGetDeviceInfo( cldevice, CL_DEVICE_PLATFORM, sizeof(pid), &pid, NULL );
+
 	HandleErrorPar( 
 		clcontext = clCreateContext( NULL, 1, &cldevice, NULL, NULL, HANDLE_ERROR )
 	);
@@ -98,6 +126,50 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	
 	float3 light = { -200.f, 60.f, -200.f };
 	
+	static bool texloaded = false;
+	static cl_mem cracked;
+	if(!texloaded)
+	{
+		int width, height;
+		width = height = 0;
+		unsigned char* tex = load_OGL_texture("Textures/crackedmud1.jpg", width, height);
+		
+		printf(" %p, %d, %d \n", tex, width, height);
+		
+		/*HandleErrorPar(
+			cracked = clCreateFromGLTexture( clcontext,
+									CL_MEM_READ_ONLY,
+									GL_TEXTURE_2D,
+									0,
+									tex,
+									HANDLE_ERROR
+								)
+		);*/
+		cl_image_format imf = { CL_RGBA, CL_UNSIGNED_INT8 };
+		cl_image_desc imd =
+		{
+			CL_MEM_OBJECT_IMAGE2D,
+			size_t(width),
+			size_t(height),
+			1,
+			1,
+			0,
+			0,
+			0,
+			0
+		};
+		HandleErrorPar(
+			cracked = clCreateImage( clcontext,
+									CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+									&imf,
+									&imd,
+									tex,
+									HANDLE_ERROR
+								)
+		);
+		texloaded = true;
+	}
+	
 	// Why can't i hold all these kernel arguments
 	HandleErrorRet( clSetKernelArg( rtkernel, 0, sizeof(U), &U) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 1, sizeof(V), &V) );
@@ -117,6 +189,7 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	HandleErrorRet( clSetKernelArg( rtkernel, 15, sizeof(int), &n_geo) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 16, sizeof(light), &light) );
 	HandleErrorRet( clSetKernelArg( rtkernel, 17, sizeof(cl_mem), &shader_data_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, 18, sizeof(cl_mem), &cracked) );
 	size_t global[] = {width, height};
 	size_t local[] = {16, 16};
 	
@@ -138,8 +211,8 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 
 RTContext::RTContext( void )
 {
-	eye = make_float3( 0.f, 0.f, 0.f );
-	angles = make_float2( 0.f, 1.57f );
+	eye = make_float3( -13.f, 10.f, 0.f );
+	angles = make_float2( 0.f, 2.15f );
 }
 
 unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
@@ -453,9 +526,10 @@ void RTContext::updateDevices( void )
 					primitives.push_back( triangles.size() - 1 );
 					break;
 				case Rectangle_t:
-					rectangles.push_back( static_cast<Rectangle*>(p)->s );
-					primitives.push_back( 2 );
-					primitives.push_back( rectangles.size() - 1 );
+					//For some reason this causes the opengl interop to freak out
+					//rectangles.push_back( static_cast<Rectangle*>(p)->s );
+					//primitives.push_back( 2 );
+					//primitives.push_back( rectangles.size() - 1 );
 					break;
 				case Quadrilateral_t:
 					quads.push_back( static_cast<Quadrilateral*>(p)->s );
@@ -489,6 +563,7 @@ void* RTContext::trace( unsigned width, unsigned height )
 {
 	float3 a2, a3;
 	
+	
 	a2 = eye + spheric(angles);
 	a3 = spheric( make_float2( angles.x, angles.y - M_PI/2.f ) );
 	
@@ -496,7 +571,7 @@ void* RTContext::trace( unsigned width, unsigned height )
 	
 	
 	calculateCameraVariables( eye, a2, a3, 45,
-				static_cast<float>(width) / static_cast<float>(height),
+				float(width) / float(height),
 				U, V, W);
 	
 	
@@ -523,8 +598,8 @@ void RTContext::strafe( float mod )
 
 void RTContext::mouse( int x, int y )
 {
-	angles.x += 0.01f * static_cast<float>(x);
-	angles.y += 0.01f * static_cast<float>(y);
+	angles.x += 0.01f * float(x);
+	angles.y += 0.01f * float(y);
 }
 
 const char* readFile(const char *filename, size_t *len)

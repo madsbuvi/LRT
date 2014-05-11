@@ -179,3 +179,7 @@ unsigned SDLControl::postactions( void )
 {
 	return SDL_GetTicks() - time;
 }
+unsigned SDLControl::timeMillis( void )
+{
+	return SDL_GetTicks();
+}

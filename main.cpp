@@ -1,21 +1,31 @@
 #include <CL/cl.h>
 #include <vector>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <chrono>
+#include <thread>
 #include "debug.h"
 #include "clstuff.h"
 #include "geometry.h"
 #include "gfx_sdl.h"
+#include "gfx_glfw.h"
 #include "control_sdl.h"
+#include "control_glfw.h"
 #include "shaders.h"
 
-Gfx* graphics;
+#define WIDTH 1440
+#define HEIGHT 900
+
+Glfwgfx* graphics;
 Control* control;
 RTContext* context;
 bool running;
 
 int main(int argc, char *argv[])
 {
-
+	double frames = 0;
+	unsigned start;
 	int num_devices = clinit();
 	if(!num_devices)
 	{
@@ -23,10 +33,10 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	context = new RTContext();
-	DeviceContext device( 0 );
+	graphics = new Glfwgfx( WIDTH, HEIGHT );
+	control = new GlfwControl( context, graphics );
+	DeviceContext device( 0, graphics->getWindow() );
 	context->registerDeviceContext( device );
-	graphics = new Sdlgfx( 1024, 768 );
-	control = new SDLControl( context );
 	
 	// The Shader family of object stores a list of all shaders made, and uses the first in the list as default shader.
 	// Can be overwritten by a call to (ShaderObject).setAsDefaultShader() on any shader object.
@@ -67,17 +77,22 @@ int main(int argc, char *argv[])
 	
 	
 	running = true;
+	start = control->timeMillis();
 	while( running ){
 		control->actions( );
-		void* test = context->trace( 1024, 768 );
-		graphics->blit( test, 1024, 768 );
+		void* test = context->trace( WIDTH, HEIGHT );
+		graphics->blit( test, WIDTH, HEIGHT );
 		graphics->update( );
+		frames++;
 		free(test);
 		unsigned time = control->postactions( );
-		if( time < 20 )
+		if( time < 10 )
 		{
-			graphics->delay( 20 - time );
+			//std::this_thread::sleep_for(std::chrono::milliseconds(10 - time));
 		}
+		glfwPollEvents();
+		double elapsed = control->timeMillis() - start;
+		if(unsigned(frames)%100==0)printf("Fps averaging to %g/s\r", (frames / elapsed)*1000.);
 	}
 	
 	return 0;

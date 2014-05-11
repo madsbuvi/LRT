@@ -24,5 +24,6 @@ class SDLControl: public Control
 	void mouseMotion( SDL_MouseMotionEvent event );
 	void actions( void );
 	unsigned postactions( void );
+	unsigned timeMillis( void );
 	void move( void );
 };

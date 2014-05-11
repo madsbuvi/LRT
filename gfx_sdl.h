@@ -1,3 +1,7 @@
+
+#ifndef gfx_sdl_h
+#define gfx_sdl_h
+
 #include <SDL.h>
 #include "gfx.h"
 #include "debug.h"
@@ -13,3 +17,5 @@ class Sdlgfx: public Gfx
 	void delay( unsigned milliseconds );
 	~Sdlgfx( void );
 };
+
+#endif

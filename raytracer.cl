@@ -1,3 +1,5 @@
+
+
 #define REGULAR 0
 #define RT_DEFAULT_MIN 0.001
 #define RT_DEFAULT_MAX 10000.
@@ -13,6 +15,10 @@
 #define printgall(a) printf( #a ": %g\n", a );
 #define printiall(a) printf( #a ": %d\n", a );
 #define printuall(a) printf( #a ": %u\n", a );
+
+
+const sampler_t smplr = CLK_ADDRESS_REPEAT | CLK_FILTER_NEAREST;
+
 
 static inline unsigned gid( void )
 {
@@ -66,6 +72,12 @@ inline float4 make_float4(const float a1, const float a2, const float a3, const 
 	return f4;
 }
 
+inline float3 chip_float4(const float4 a1)
+{
+	float3 f3 = {a1.x, a1.y, a1.z};
+	return f3;
+}
+
 inline float4 extend_float3(const float3 a1, const float a2)
 {
 	float4 f4 = {a1.x, a1.y, a1.z, a2};
@@ -77,6 +89,13 @@ inline float3 make_float3(const float a1, const float a2, const float a3)
 	float3 f3 = {a1, a2, a3};
 	return f3;
 }
+
+inline float2 chip_float3(const float3 a1)
+{
+	float2 f2 = {a1.x, a1.y};
+	return f2;
+}
+
 
 
 inline float3 fminf3(const float3 a, const float3 b)
@@ -101,13 +120,14 @@ inline float fmaxf(const float3 a)
 
 static uint make_color( float3 in )
 {
-	uint color = 255u;
-	color = color << 8u;
-	color += (uint)( fmin( fabs(in.x), 1.f )*255.f );
+	uint color = 0;
+	color += (uint)( fmin( fabs(in.z), 1.f )*255.f );
 	color = color << 8u;
 	color += (uint)( fmin( fabs(in.y), 1.f )*255.f );
 	color = color << 8u;
-	color |= (uint)( fmin( fabs(in.z), 1.f )*255.f );
+	color |= (uint)( fmin( fabs(in.x), 1.f )*255.f );
+	color = color << 8u;
+	color += 255u;
 	return color;
 }
 
@@ -387,12 +407,13 @@ static float3 diffusion_shader_( Ray ray, float3 light_pos, float3 normal, float
 // Or #define it from host for extra performance
 
 #define ambient_effect make_float3( 1.f, 1.f, 1.f )
-#define ambient_color make_float3( 0.1f, 0.3f, 0.0f )
+#define ambient_color make_float3( 0.1f, 0.1f, 0.1f )
 #define specular_color make_float3( 0.6f, 0.6f, 0.6f )
 #define diffuse_color make_float3( 0.2f, 0.7f, 0.1f )
 #define phong_exponent 132.f
 
-static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
+static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data,
+							__read_only image2d_t textr )
 {
 	float3 hit_point = ray.origin + ray.direction * t;
 	float3 light_dir = normalize( light_pos - hit_point );
@@ -402,7 +423,13 @@ static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float 
 											light_dir )
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f;
-	float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
+	int2 coord = { hit_point.x*250, hit_point.z*250 };
+
+	uint4 texui = read_imageui( textr, smplr, coord );
+	float3 tex = make_float3( texui.x, texui.y, texui.z ) / 255.f;
+	
+	//float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
+	float3 result = ambient_effect * ambient_color + tex * totallight;
 	
 	// Add shadows here
 	
@@ -446,7 +473,10 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	float3 light_pos,
 	
 	/* Shader data */
-	__global float* shader_data
+	__global float* shader_data,
+	
+	/* Texture(s) */
+	__read_only image2d_t textr
 	)
 {
 	// CAMERA
@@ -454,7 +484,7 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	float2 d2 = {get_global_size(0), get_global_size(1)};
 	float2 d = d1 / d2 * 2.f - 1.f;
 	float3 ray_origin = eye;
-	float3 ray_direction = normalize(d.x*U + d.y*V + W);
+	float3 ray_direction = normalize(d.x*U - d.y*V + W);
 	/*
 	if( fabs(ray_direction.x) < RT_MIN_ANGLE ) ray_direction.x = RT_MIN_ANGLE;
 	if( fabs(ray_direction.y) < RT_MIN_ANGLE ) ray_direction.y = RT_MIN_ANGLE;
@@ -523,7 +553,7 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 		switch( shader )
 		{
 			case SIMPLE_DIFFUSION_SHADER:
-				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ] );
+				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ], textr );
 				break;
 		}
 	}

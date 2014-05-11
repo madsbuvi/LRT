@@ -2,9 +2,9 @@
 Sdlgfx::Sdlgfx( unsigned width, unsigned height )
 {
 	SDL_Init( SDL_INIT_EVERYTHING );
-	wwidth = width;
-	wheight = height;
-	window = SDL_CreateWindow( "Lemmings 3D: RT", 10, 10, wwidth, wheight, SDL_WINDOW_RESIZABLE );
+	this->width = width;
+	this->height = height;
+	window = SDL_CreateWindow( title, 10, 10, width, height, SDL_WINDOW_RESIZABLE );
 	if(!window)
 	{
 		dprintf( 0, "Could not create a window: %s\n", SDL_GetError() );
@@ -15,14 +15,14 @@ Sdlgfx::Sdlgfx( unsigned width, unsigned height )
 void Sdlgfx::blit( void* pixels, uint32_t width, uint32_t height )
 {	
 	SDL_Surface* second;
-	width = width < wwidth ? width : wwidth;
-	height = height < wheight ? height : wheight;
+	width = width < this->width ? width : this->width;
+	height = height < this->height ? height : this->height;
 	second = SDL_CreateRGBSurfaceFrom(
 		pixels,
 		width,
 		height,
 		32,
-		wwidth*sizeof(uint32_t),
+		width*sizeof(uint32_t),
 		0x000000ff,
 		0x0000ff00,
 		0x00ff0000,
