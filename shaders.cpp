@@ -16,3 +16,8 @@ void SimpleDiffusionShader::writeShaderData( std::vector<float>& buffer )
 	buffer.push_back( color.y );
 	buffer.push_back( color.z );
 }
+
+void SimpleDiffusionShaderTex::writeShaderData( std::vector<float>& buffer )
+{
+	tex->writeTextureData( buffer );
+}

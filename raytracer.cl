@@ -6,6 +6,7 @@
 #define MISS make_float4( 0.f, 0.f, 0.f, RT_DEFAULT_MAX +1.f )
 
 #define SIMPLE_DIFFUSION_SHADER 0
+#define SIMPLE_DIFFUSION_SHADER_TEX 1
 
 #define printg3(a) if( gid() == 0 )printf( #a ": %g, %g, %g\n", a.x, a.y, a.z );
 #define printg(a) if( gid() == 0 )printf( #a ": %g\n", a );
@@ -388,7 +389,7 @@ float3 faceback(const float3 n, const float3 i)
 	return -n;
 }
 
-static float3 diffusion_shader_( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
+static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
 {
 	float3 hit_point = ray.origin + ray.direction * t;
 	normal = faceback( normal, ray.direction );
@@ -412,8 +413,16 @@ static float3 diffusion_shader_( Ray ray, float3 light_pos, float3 normal, float
 #define diffuse_color make_float3( 0.2f, 0.7f, 0.1f )
 #define phong_exponent 132.f
 
-static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data,
-							__read_only image2d_t textr )
+static float gmod( float a1, float a2 )
+{
+	float ratio = a1 / a2;
+	a1 = (ratio - floor(ratio))*a2;
+	if(a2 - a1 < 5e-5) return 0.f;
+	return a1;
+}
+
+static float3 diffusion_shader_tex( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data,
+							__read_only image2d_array_t textr )
 {
 	float3 hit_point = ray.origin + ray.direction * t;
 	float3 light_dir = normalize( light_pos - hit_point );
@@ -424,8 +433,11 @@ static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float 
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f;
 	//int2 coord = { hit_point.x, hit_point };
-
-	uint4 texui = read_imageui( textr, smplr, hit_point.xz );
+	//printf( "<%g, %g, %g>\n",  hit_point.z, fmod(hit_point.z, shader_data[2]), gmod(hit_point.z, shader_data[2]) );
+	uint4 texui = read_imageui( textr, smplr, make_float4(
+							gmod(hit_point.x, shader_data[1]),
+							gmod(hit_point.z, shader_data[2]),
+							shader_data[0], 0 ) );
 	float3 tex = make_float3( texui.x, texui.y, texui.z ) / 255.f;
 	
 	//float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
@@ -476,7 +488,8 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	__global float* shader_data,
 	
 	/* Texture(s) */
-	__read_only image2d_t textr
+	__read_only image2d_t textr,
+	__read_only image2d_array_t pack
 	)
 {
 	// CAMERA
@@ -514,16 +527,17 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 			switch( type )
 			{
 				case 0:
-					
+				{
 					Sphere sphere = { sphere_centers[index], sphere_radi[index] };
 					nyligst = intersect_sphere2(ray, sphere);
 					break;
-					
+				}	
 				case 1:
 					nyligst = intersect_triangle(ray, triangles[index*3], triangles[index*3+1], triangles[index*3+2] );
 					break;
 					
 				case 5:
+				{
 					Box box = {
 						boxes[ index*3 + 0 ],
 						boxes[ index*3 + 1 ],
@@ -533,6 +547,7 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 
 					nyligst = intersect_box( ray, box );
 					break;
+				}
 			}
 			
 			if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w )
@@ -553,7 +568,10 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 		switch( shader )
 		{
 			case SIMPLE_DIFFUSION_SHADER:
-				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ], textr );
+				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ]);
+				break;
+			case SIMPLE_DIFFUSION_SHADER_TEX:
+				result = diffusion_shader_tex( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ], pack );
 				break;
 		}
 	}

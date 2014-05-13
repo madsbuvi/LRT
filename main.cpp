@@ -22,11 +22,13 @@ Control* control;
 RTContext* context;
 bool running;
 
+
 int main(int argc, char *argv[])
 {
 	double frames = 0;
 	unsigned start;
 	int num_devices = clinit();
+	
 	if(!num_devices)
 	{
 		dprintf( 0, "No GPU devices available\n");
@@ -38,20 +40,24 @@ int main(int argc, char *argv[])
 	DeviceContext device( 0, graphics->getWindow() );
 	context->registerDeviceContext( device );
 	
+	Texture* stardust = new Texture("Textures/stardust.png");
+	Texture* cgo = new Texture("Textures/congruent_outline.png");
+	Texture* cracked = new Texture("Textures/crackedmud1.jpg");
+	
 	// The Shader family of object stores a list of all shaders made, and uses the first in the list as default shader.
 	// Can be overwritten by a call to (ShaderObject).setAsDefaultShader() on any shader object.
 	// Note also that i'm a retard so we get BGR instead of RGB
-	new SimpleDiffusionShader( make_float3( 0.f, 1.f, 0.f ) );
+	new SimpleDiffusionShaderTex( cgo );
 	
 	context->addGeometry( make_sphere( make_float3( 3.f, 10.f, 3.f ), 1.f ),
-						new SimpleDiffusionShader( make_float3( 0.55f, 0.55f, 0.44f ) ) );
+						new SimpleDiffusionShaderTex( cracked ) );
 	
 	context->addGeometry( make_sphere( make_float3( 4.f, 10.f, 3.f ), 1.f ) );
 	context->addGeometry( make_sphere( make_float3( 5.f, 10.f, 3.f ), 1.f ),
 						new SimpleDiffusionShader( make_float3( 0.50f, 0.50f, 0.55f ) ) );
 	context->addGeometry( make_sphere( make_float3( 6.f, 10.f, 3.f ), 1.f ) );
 	context->addGeometry( make_sphere( make_float3( 7.f, 10.f, 3.f ), 1.f ),
-						new SimpleDiffusionShader( make_float3( 0.45f, 0.45f, 0.66f ) ) );
+						new SimpleDiffusionShaderTex( stardust ) );
 	context->addGeometry( make_sphere( make_float3( 8.f, 10.f, 3.f ), 1.f ) );
 	context->addGeometry( make_sphere( make_float3( 3.f, 10.f, 4.f ), 1.f ),
 						new SimpleDiffusionShader( make_float3( 0.40f, 0.40f, 0.77f ) ) );

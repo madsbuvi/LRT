@@ -5,8 +5,10 @@
 #include "debug.h"
 #include <vector>
 #include <stdexcept>
+#include "texture.h"
 
 #define SIMPLE_DIFFUSION_SHADER 0
+#define SIMPLE_DIFFUSION_SHADER_TEX 1
 
 
 class Shader
@@ -37,11 +39,13 @@ class SimpleDiffusionShader: public Shader
 };
 
 
-
-
-
-
-
+class SimpleDiffusionShaderTex: public Shader
+{
+	Texture* tex;
+	public:
+	SimpleDiffusionShaderTex( Texture* texture ){ shader = SIMPLE_DIFFUSION_SHADER_TEX; tex = texture; };
+	void writeShaderData( std::vector<float>& buffer );
+};
 
 
 #endif

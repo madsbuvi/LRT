@@ -8,7 +8,7 @@ LFLAGS = -lpthread -lOpenCL -lmingw32 -lSOIL -lSDL2main -lSDL2 -lglfw3 -lglu32 -
 # GTKFLAGS =  -I"D:\usr\dev\include\gtksourceview-2.0" -ID:/usr/dev/include/gtk-2.0 -ID:/usr/dev/lib/gtk-2.0/include -ID:/usr/dev/include/atk-1.0 -ID:/usr/dev/include/cairo -ID:/usr/dev/include/gdk-pixbuf-2.0 -ID:/usr/dev/include/pango-1.0 -ID:/usr/dev/include/glib-2.0 -ID:/usr/dev/lib/glib-2.0/include -ID:/usr/dev/include
 
 TARG = LemmingsRT.exe
-OBJS = main.o clstuff.o gfx_sdl.o gfx_glfw.o control_sdl.o control_glfw.o geometry.o shaders.o oglstuff.o
+OBJS = main.o clstuff.o gfx_sdl.o gfx_glfw.o control_sdl.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o
 includes = $(wildcard *.h)
 
 
