@@ -58,11 +58,16 @@ class DeviceContext
 	cl_mem triangles_dev;
 	int n_triangles;
 	
-	// Triangle data
+	// Box data
 	bool boxes_allocated;
 	cl_mem boxes_dev;
 	cl_mem box_heights_dev;
 	int n_boxes;
+	
+	// AAB data
+	bool AAB_allocated;
+	cl_mem AAB_dev;
+	int n_AABs;
 	
 	// Geometry data
 	bool geometry_allocated;
@@ -76,6 +81,7 @@ class DeviceContext
 	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
 	void updateSpheres( std::vector<Sphere_struct>& spheres );
 	void updateTriangles( std::vector<Triangle_struct>& triangles );
+	void updateAABs( std::vector<AAB_struct>& AABs);
 	void updateBoxes( std::vector<Box_struct>& boxes );
 	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int>& primitives, std::vector<float>& shader_data );
 };
@@ -83,15 +89,15 @@ class DeviceContext
 class RTContext
 {
 	std::vector<DeviceContext> devices;
-	std::vector<Geometry> geometry;
+	std::vector<Geometry*> geometry;
 	float3 eye;
 	float2 angles;
 	void updateDevices( void );
 	public:
 	RTContext( void );
 	unsigned registerDeviceContext( DeviceContext dcontext );
-	int addGeometry( Geometry g ){ geometry.push_back( g ); return geometry.size(); };
-	int addGeometry( Geometry g, Shader* shader ){ g.setShader( shader ); geometry.push_back( g ); return geometry.size(); };
+	int addGeometry( Geometry* g ){ geometry.push_back( g ); return geometry.size(); };
+	int addGeometry( Geometry* g, Shader* shader ){ g->setShader( shader ); geometry.push_back( g ); return geometry.size(); };
 	void* trace( unsigned width, unsigned height );
 	void step( float mod );
 	void strafe( float mod );

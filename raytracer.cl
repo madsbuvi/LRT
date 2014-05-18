@@ -3,7 +3,6 @@
 #define REGULAR 0
 #define RT_DEFAULT_MIN 0.001
 #define RT_DEFAULT_MAX 10000.
-#define MISS make_float4( 0.f, 0.f, 0.f, RT_DEFAULT_MAX +1.f )
 
 #define SIMPLE_DIFFUSION_SHADER 0
 #define SIMPLE_DIFFUSION_SHADER_TEX 1
@@ -18,15 +17,29 @@
 #define printuall(a) printf( #a ": %u\n", a );
 
 
-const sampler_t smplr = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_MIRRORED_REPEAT | CLK_FILTER_LINEAR;
+__constant const sampler_t smplr = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_MIRRORED_REPEAT | CLK_FILTER_LINEAR;
 
+enum PrimitiveType { Sphere_t, Triangle_t, Rectangle_t, Quadrilateral_t, AAB_t, Box_t };
 
 static inline unsigned gid( void )
 {
 	return get_global_id(1) * get_global_size(0) + get_global_id(0);
 }
 
-typedef struct{
+typedef struct {
+	float3 normal;
+	float t;
+	float2 tex;
+} Result;
+
+__constant Result MISS =
+{
+	{ 0.f, 0.f, 0.f },
+	-1.f,
+	{0.f, 0.f}
+};
+
+typedef struct {
 	float3 origin;
 	float3 direction;
 	int type;
@@ -133,8 +146,9 @@ static uint make_color( float3 in )
 }
 
 
-static float4 intersect_AABB( Ray ray, float3 bmin, float3 bmax )
+static Result intersect_AAB( Ray ray, float3 bmin, float3 bmax )
 {
+
 	// Simple Axis Aligned Box intersection
 	float3 t_0    = (bmin - ray.origin)/ray.direction;
 	float3 t_1    = (bmax - ray.origin)/ray.direction;
@@ -156,20 +170,52 @@ static float4 intersect_AABB( Ray ray, float3 bmin, float3 bmax )
 		}
 		t_near = t_far;
 	}
-
-
-	if(t_near == t_0.x || t_near == t_1.x)
+	
+	Result res =
 	{
-		return make_float4( 1.f, 0.f, 0.f, t_near );
+		{ 0.f, 0.f, 0.f },
+		t_near,
+		{ 0.f, 0.f }
+	};
+	
+	float3 hit = ( ray.origin + t_near*ray.direction );
+	float3 dims = bmax - bmin;
+
+	if( t_near == t_0.x )
+	{
+		res.normal = make_float3( 1.f, 0.f, 0.f );
+		res.tex = hit.zy / dims.zy;
+		res.tex.y = -res.tex.y;
 	}
-	else if(t_near == t_0.y || t_near == t_1.y)
+	else if( t_near == t_1.x )
 	{
-		return make_float4( 0.f, 1.f, 0.f, t_near );
+		res.normal = make_float3( 1.f, 0.f, 0.f );
+		res.tex = -hit.zy / dims.zy;
+	}
+	else if( t_near == t_0.y )
+	{
+		res.normal = make_float3( 0.f, 1.f, 0.f );
+		res.tex = -hit.xz / dims.xz;
+		res.tex.y = -res.tex.y;
+	}
+	else if( t_near == t_1.y )
+	{
+		res.normal = make_float3( 0.f, 1.f, 0.f );
+		res.tex = -hit.xz / dims.xz;
+	}
+	else if( t_near == t_0.z )
+	{
+		res.normal = make_float3( 0.f, 0.f, 1.f );
+		res.tex = -hit.xy / dims.xy;
 	}
 	else
 	{
-		return make_float4( 0.f, 0.f, 1.f, t_near );
+		res.normal = make_float3( 0.f, 0.f, 1.f );
+		res.tex = hit.xy / dims.xy;
+		res.tex.y = -res.tex.y;
 	}
+	
+	return res;
 }
 
 static float intersect_plane( Ray ray, float3 v1, float3 v2, float3 v3 )
@@ -187,11 +233,13 @@ static float intersect_plane( Ray ray, float3 v1, float3 v2, float3 v3 )
 	a = -dot( n, w0 );
 	b = dot( n, ray.direction );
 	
-	return a / b;
+	float t = a / b;
+	
+	return t;
 	
 }
 
-static float4 intersect_box( Ray ray, Box box )
+static Result intersect_box( Ray ray, Box box )
 {
 	// Simple Axis Aligned Box intersection
 	float n1, n2, n3, f1, f2, f3;
@@ -238,24 +286,34 @@ static float4 intersect_box( Ray ray, Box box )
 		t_near = t_far;
 	}
 
+	Result res =
+	{
+		{ 0.f, 0.f, 0.f },
+		t_near,
+		( ray.origin + t_near*ray.direction ).xz
+	};
+
 
 	if(t_near == t_0.x || t_near == t_1.x)
 	{
-		return extend_float3( normalize( cross( v1 - v2, v1 - v3 ) ), t_near );
+		res.normal = normalize( cross( v1 - v2, v1 - v3 ) );
 	}
 	else if(t_near == t_0.y || t_near == t_1.y)
 	{
-		return extend_float3( normalize( cross( v1 - v2, v1 - v6 ) ), t_near );
+		res.normal = normalize( cross( v1 - v2, v1 - v6 ) );
 	}
 	else
 	{
-		return extend_float3( normalize( cross( v1- v3, v1 - v7 ) ), t_near );
+		res.normal = normalize( cross( v1 - v3, v1 - v7 ) );
 	}
+	
+	
+	return res;
 }
 
-
+/*
 // Sphere buils down to a simple quadratic euqation
-static float4 intersect_sphere( Ray ray, float3 center, float radius )
+static Result intersect_sphere( Ray ray, float3 center, float radius )
 {
 	float a,b,c;
 	//Move sphere to origin
@@ -288,9 +346,9 @@ static float4 intersect_sphere( Ray ray, float3 center, float radius )
 		t = t1;
 	}
 	return extend_float3( normal, t );
-}
+}*/
 
-static float4 intersect_sphere2( Ray ray, Sphere s )
+static Result intersect_sphere2( Ray ray, Sphere s )
 {
 	float a,b,c;
 	//Move sphere to origin
@@ -308,7 +366,6 @@ static float4 intersect_sphere2( Ray ray, Sphere s )
 	float t1 = (-b + discriminant) / (2.f * a);
 	float t0 = (-b - discriminant) / (2.f * a);
 
-	float3 normal;
 	float t;
 	t = t0;
 	if( t <= RT_DEFAULT_MIN ) t = t1;
@@ -316,14 +373,20 @@ static float4 intersect_sphere2( Ray ray, Sphere s )
 	if( t > RT_DEFAULT_MIN )
 	{
 		float3 hit = ray.origin + ray.direction*t0;
-		normal = normalize( s.center - hit );
-		return extend_float3( normal, t );
+		
+		Result res =
+		{
+			normalize( s.center - hit ),
+			t,
+			hit.xz
+		};
+		return res;
 	}
 	return MISS;
 }
 
 //Checks if a ray intersects a specific triangle
-static float4 intersect_triangle( Ray ray, float3 v1, float3 v2, float3 v3 )
+static Result intersect_triangle( Ray ray, float3 v1, float3 v2, float3 v3 )
 {
 	//Step 1: Determine if we are intersecting the triangle's plane.
 	float3 u, v, n;
@@ -375,7 +438,14 @@ static float4 intersect_triangle( Ray ray, float3 v1, float3 v2, float3 v3 )
 	
 	n = normalize(n);
 	
-	return extend_float3( n, r );
+	Result res = 
+	{
+		n,
+		r,
+		hit.xz
+	};
+	
+	return res;
 }
 
 // Returns the negative of n if i and n point in the same direction (are within 90 degrees of eachother)
@@ -389,12 +459,11 @@ float3 faceback(const float3 n, const float3 i)
 	return -n;
 }
 
-static float3 diffusion_shader( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data )
+static float3 diffusion_shader( Ray ray, float3 light_pos, Result data, __global float* shader_data )
 {
-	float3 hit_point = ray.origin + ray.direction * t;
-	normal = faceback( normal, ray.direction );
+	float3 hit_point = ray.origin + ray.direction * data.t;
 	// Diffuse lighting based on rotation relative to light source
-	float diffuseFactor = max( dot( normalize( normal ),
+	float diffuseFactor = max( dot( normalize( data.normal ),
 											normalize( light_pos - hit_point ) )
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f + make_float3(0.5f, 0.5f, 0.5f);
@@ -421,22 +490,21 @@ static float gmod( float a1, float a2 )
 	return a1;
 }
 
-static float3 diffusion_shader_tex( Ray ray, float3 light_pos, float3 normal, float t, __global float* shader_data,
+static float3 diffusion_shader_tex( Ray ray, float3 light_pos, Result data, __global float* shader_data,
 							__read_only image2d_array_t textr )
 {
-	float3 hit_point = ray.origin + ray.direction * t;
+	float3 hit_point = ray.origin + ray.direction * data.t;
 	float3 light_dir = normalize( light_pos - hit_point );
-	normal = faceback( normal, ray.direction );
 	// Diffuse lighting based on rotation relative to light source
-	float diffuseFactor = max( dot( normalize( normal ),
+	float diffuseFactor = max( dot( normalize( data.normal ),
 											light_dir )
 								, 0.0f );
 	float3 totallight = diffuseFactor * 0.5f;
 	//int2 coord = { hit_point.x, hit_point };
 	//printf( "<%g, %g, %g>\n",  hit_point.z, fmod(hit_point.z, shader_data[2]), gmod(hit_point.z, shader_data[2]) );
 	uint4 texui = read_imageui( textr, smplr, make_float4(
-							gmod(hit_point.x, shader_data[1]),
-							gmod(hit_point.z, shader_data[2]),
+							gmod(data.tex.x, shader_data[1]),
+							gmod(data.tex.y, shader_data[2]),
 							shader_data[0], 0 ) );
 	float3 tex = make_float3( texui.x, texui.y, texui.z ) / 255.f;
 	
@@ -449,7 +517,7 @@ static float3 diffusion_shader_tex( Ray ray, float3 light_pos, float3 normal, fl
 	
 	// Phong specular
 	float3 h = normalize( light_dir - ray.direction );
-	float d = dot( normal, h );
+	float d = dot( data.normal, h );
 	float power;
 	if( d > 0)
 	{
@@ -476,6 +544,8 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	/* Triangle parameters */
 	__global float3* triangles, int ntriangles,
 	/* Box parameters */
+	__global float3* AABs, int nAABs,
+	/* Box parameters */
 	__global float3* boxes, __global float* box_heights, int nboxes,
 	
 	/* Geometry */
@@ -488,7 +558,6 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	__global float* shader_data,
 	
 	/* Texture(s) */
-	__read_only image2d_t textr,
 	__read_only image2d_array_t pack
 	)
 {
@@ -508,15 +577,15 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	
 	// RAY TRACING
 	
-	float4 closest = MISS;
-	int shader = 0;
-	int shader_data_index = 0;
-	float4 nyligst;
+	Result closest = MISS;
+	closest.t = RT_DEFAULT_MAX+1.f;
+	Result nyligst;
+	int shader_i = 0;
 	//printi( nobjects );
 	
 	for( int i = 0; i < nobjects; i++ )
 	{
-		__global int* p = &primitives[ geometry[ i*4 ] * 2 ];
+		__global int* p = &primitives[ geometry[ i*4 ] ];
 		int nprim = geometry[ i*4 + 1];
 		for( int j = 0; j < nprim; j++ )
 		{
@@ -526,17 +595,20 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 			
 			switch( type )
 			{
-				case 0:
+				case Sphere_t:
 				{
 					Sphere sphere = { sphere_centers[index], sphere_radi[index] };
-					nyligst = intersect_sphere2(ray, sphere);
+					nyligst = intersect_sphere2( ray, sphere );
 					break;
 				}	
-				case 1:
-					nyligst = intersect_triangle(ray, triangles[index*3], triangles[index*3+1], triangles[index*3+2] );
+				case Triangle_t:
+					nyligst = intersect_triangle( ray, triangles[index*3], triangles[index*3+1], triangles[index*3+2] );
 					break;
 					
-				case 5:
+				case AAB_t:
+					nyligst = intersect_AAB( ray, AABs[ index*2 ], AABs[ index*2 + 1 ] );
+					break;
+				case Box_t:
 				{
 					Box box = {
 						boxes[ index*3 + 0 ],
@@ -546,32 +618,34 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 					};
 
 					nyligst = intersect_box( ray, box );
+					
 					break;
 				}
 			}
-			
-			if( nyligst.w > RT_DEFAULT_MIN && nyligst.w < closest.w )
+
+			if( nyligst.t > RT_DEFAULT_MIN && nyligst.t < closest.t )
 			{
 				closest = nyligst;
-				shader = geometry[ i*4 + 2 ];
-				shader_data_index = geometry[ i*4 + 3 ];
+				shader_i = i;
 			}
 			
 		}
 	}
+	int shader = geometry[ shader_i*4 + 2 ];
+	int shader_data_index = geometry[ shader_i*4 + 3 ];
 
 	
 	float3 result = make_float3( 0.f, 0.f, 0.f );
-	if(closest.w > RT_DEFAULT_MIN && closest.w < RT_DEFAULT_MAX )
+	if(closest.t > RT_DEFAULT_MIN && closest.t < RT_DEFAULT_MAX )
 	{
-		float3 normal = make_float3( closest.x, closest.y, closest.z );
+		closest.normal = faceback( closest.normal, ray.direction );
 		switch( shader )
 		{
 			case SIMPLE_DIFFUSION_SHADER:
-				result = diffusion_shader( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ]);
+				result = diffusion_shader( ray, light_pos, closest, &shader_data[ shader_data_index ]);
 				break;
 			case SIMPLE_DIFFUSION_SHADER_TEX:
-				result = diffusion_shader_tex( ray, light_pos, normal, closest.w, &shader_data[ shader_data_index ], pack );
+				result = diffusion_shader_tex( ray, light_pos, closest, &shader_data[ shader_data_index ], pack );
 				break;
 		}
 	}

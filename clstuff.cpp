@@ -116,6 +116,7 @@ DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 	triangles_allocated = false;
 	boxes_allocated = false;
 	geometry_allocated = false;
+	AAB_allocated = false;
 }
 
 
@@ -127,73 +128,38 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	
 	float3 light = { -200.f, 60.f, -200.f };
 	
+	// This stuff is just a temporary way of ordering stuff.
 	static bool texloaded = false;
-	static cl_mem cracked;
 	static cl_mem pack;
 	if(!texloaded)
 	{
-		int width, height;
-		width = height = 0;
-		unsigned char* tex = load_OGL_texture("Textures/crackedmud1.jpg", width, height);
-		
-		/*HandleErrorPar(
-			cracked = clCreateFromGLTexture( clcontext,
-									CL_MEM_READ_ONLY,
-									GL_TEXTURE_2D,
-									0,
-									tex,
-									HANDLE_ERROR
-								)
-		);*/
-		cl_image_format imf = { CL_RGBA, CL_UNSIGNED_INT8 };
-		cl_image_desc imd =
-		{
-			CL_MEM_OBJECT_IMAGE2D,
-			size_t(width),
-			size_t(height),
-			1,
-			1,
-			0,
-			0,
-			0,
-			0
-		};
-		HandleErrorPar(
-			cracked = clCreateImage( clcontext,
-									CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-									&imf,
-									&imd,
-									tex,
-									HANDLE_ERROR
-								)
-		);
-		
 		pack = Texture::compileTextureImage( clcontext, clqueue );
-		
 		texloaded = true;
 	}
 	
 	// Why can't i hold all these kernel arguments
-	HandleErrorRet( clSetKernelArg( rtkernel, 0, sizeof(U), &U) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 1, sizeof(V), &V) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 2, sizeof(W), &W) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 3, sizeof(eye), &eye) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 4, sizeof(cl_mem), &devmem) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 5, sizeof(cl_mem), &sphere_centers_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 6, sizeof(cl_mem), &sphere_radi_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 7, sizeof(int), &n_spheres) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 8, sizeof(cl_mem), &triangles_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 9, sizeof(int), &n_triangles) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 10, sizeof(cl_mem), &boxes_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 11, sizeof(cl_mem), &box_heights_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 12, sizeof(int), &n_boxes) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 13, sizeof(cl_mem), &geometry_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 14, sizeof(cl_mem), &primitives_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 15, sizeof(int), &n_geo) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 16, sizeof(light), &light) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 17, sizeof(cl_mem), &shader_data_dev) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 18, sizeof(cl_mem), &cracked) );
-	HandleErrorRet( clSetKernelArg( rtkernel, 19, sizeof(cl_mem), &pack) );
+	int arg = 0;
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(U), &U) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(V), &V) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(W), &W) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(eye), &eye) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &devmem) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &sphere_centers_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &sphere_radi_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_spheres) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &triangles_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_triangles) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &AAB_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_AABs) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &boxes_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &box_heights_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_boxes) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &geometry_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &primitives_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_geo) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(light), &light) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &shader_data_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &pack) );
 	size_t global[] = {width, height};
 	size_t local[] = {16, 16};
 	
@@ -364,6 +330,44 @@ void DeviceContext::updateTriangles( std::vector<Triangle_struct>& triangles )
 	}
 }
 
+void DeviceContext::updateAABs( std::vector<AAB_struct>& AABs)
+{
+	if( AAB_allocated )
+	{
+		HandleErrorRet(
+			clReleaseMemObject( AAB_dev )
+		);
+	}
+	
+	n_AABs = AABs.size();
+	
+	if( n_AABs )
+	{
+		AAB_dev = cl_malloc( clcontext, n_AABs * 2 * sizeof( float3 ) );
+		AAB_allocated = true;
+		float3* array;
+		HandleErrorPar(
+			array = (float3*)clEnqueueMapBuffer( clqueue, AAB_dev, true, CL_MAP_WRITE, 0, n_AABs * 2 * sizeof( float3 ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		
+		for( int i = 0; i < n_AABs; i++ )
+		{
+			array[ i*2 ] = AABs[i].bmin;
+			array[ i*2+1 ] = AABs[i].bmax;
+		}
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, AAB_dev, (void*)array, 0, NULL, NULL )
+		);
+		
+	}
+	else
+	{
+		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
+		AAB_dev = cl_malloc( clcontext, 128 );
+		AAB_allocated = true;
+	}
+}
+
 void DeviceContext::updateBoxes( std::vector<Box_struct>& boxes)
 {
 	if( boxes_allocated )
@@ -506,16 +510,16 @@ void RTContext::updateDevices( void )
 	std::vector<int> primitives;
 	std::vector<float> shader_data;
 	
-	for( Geometry geo: geometry )
+	for( Geometry* geo: geometry )
 	{
 		Geometrydata data;
-		data.primindex = gd.size();
-		data.nprim = geo.getPrimitives()->size();
-		data.shader = geo.getShader()->shader;
+		data.primindex = primitives.size();
+		data.nprim = geo->getPrimitives()->size();
+		data.shader = geo->getShader()->shader;
 		data.shaderindex = shader_data.size();
-		geo.getShader()->writeShaderData(shader_data);
+		geo->getShader()->writeShaderData(shader_data);
 		
-		for( Primitive* p: *geo.getPrimitives() )
+		for( Primitive* p: *geo->getPrimitives() )
 		{
 			switch( p->getType() )
 			{
@@ -561,6 +565,7 @@ void RTContext::updateDevices( void )
 	devices[0].updateTriangles( triangles );
 	devices[0].updateBoxes( boxes );
 	devices[0].updateGeometry( gd, primitives, shader_data );
+	devices[0].updateAABs( AABs );
 }
 
 void* RTContext::trace( unsigned width, unsigned height )
