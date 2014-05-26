@@ -5,6 +5,8 @@
 #include "clstuff.h"
 #include "oglstuff.h"
 #include "texture.h"
+#include "shared.h"
+#include "host_tracer.h"
 static std::vector<cl_device_id> device_vector;
 
 
@@ -96,7 +98,7 @@ DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 	);
 	
 	/* Build Kernel Program */
-	cl_int ret = clBuildProgram( rtprogram, 1, &cldevice, "", NULL, NULL );
+	cl_int ret = clBuildProgram( rtprogram, 1, &cldevice, "-I ./", NULL, NULL );
 	if( ret ){
 		fprintf( stderr, "Error code %d:\n", ret );
 		size_t ssiz = 0;
@@ -179,18 +181,6 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	return (void*) output;
 }
 
-RTContext::RTContext( void )
-{
-	eye = make_float3( 2.97109f, -0.0317413f, -1.68819f );
-	angles = make_float2( 1.52f, 1.81f );
-}
-
-unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
-{
-	devices.push_back( dcontext );
-	return devices.size();
-}
-
 /*
  *	Calculate pinhole camera vectors.
  *	eye  - the position of the camera
@@ -240,7 +230,7 @@ static float3 spheric(float2 angles)
 	return out;
 }
 
-void DeviceContext::updateSpheres( std::vector<Sphere_struct>& spheres )
+void DeviceContext::updateSpheres( std::vector<Sphere>& spheres )
 {
 	if( spheres_allocated )
 	{
@@ -291,7 +281,7 @@ void DeviceContext::updateSpheres( std::vector<Sphere_struct>& spheres )
 }
 
 
-void DeviceContext::updateTriangles( std::vector<Triangle_struct>& triangles )
+void DeviceContext::updateTriangles( std::vector<Triangle>& triangles )
 {
 	if( triangles_allocated )
 	{
@@ -330,7 +320,7 @@ void DeviceContext::updateTriangles( std::vector<Triangle_struct>& triangles )
 	}
 }
 
-void DeviceContext::updateAABs( std::vector<AAB_struct>& AABs)
+void DeviceContext::updateAABs( std::vector<AAB_s>& AABs)
 {
 	if( AAB_allocated )
 	{
@@ -368,7 +358,7 @@ void DeviceContext::updateAABs( std::vector<AAB_struct>& AABs)
 	}
 }
 
-void DeviceContext::updateBoxes( std::vector<Box_struct>& boxes)
+void DeviceContext::updateBoxes( std::vector<Box>& boxes)
 {
 	if( boxes_allocated )
 	{
@@ -456,7 +446,7 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 		HandleErrorPar(
 			sd = (float*)clEnqueueMapBuffer( clqueue, shader_data_dev, true, CL_MAP_WRITE, 0, n_shader_data * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
 		);
-		
+
 		for( int i = 0; i < n_geo; i++ )
 		{
 			geo[ i*4 ] = gd[i].primindex;
@@ -500,12 +490,11 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 
 void RTContext::updateDevices( void )
 {
-	std::vector<Sphere_struct> spheres;
-	std::vector<Triangle_struct> triangles;
-	std::vector<Rectangle_struct> rectangles;
-	std::vector<Quadrilateral_struct> quads;
-	std::vector<AAB_struct> AABs;
-	std::vector<Box_struct> boxes;
+	std::vector<Sphere> spheres;
+	std::vector<Triangle> triangles;
+	std::vector<Quadrilateral> quads;
+	std::vector<AAB_s> AABs;
+	std::vector<Box> boxes;
 	std::vector<Geometrydata> gd;
 	std::vector<int> primitives;
 	std::vector<float> shader_data;
@@ -523,34 +512,28 @@ void RTContext::updateDevices( void )
 		{
 			switch( p->getType() )
 			{
-				case Sphere_t:
-					spheres.push_back( static_cast<Sphere*>(p)->s );
+				case SPHERE:
+					spheres.push_back( static_cast<Sphere_t*>(p)->s );
 					primitives.push_back( 0 );
 					primitives.push_back( spheres.size() - 1 );
 					break;
-				case Triangle_t:
-					triangles.push_back( static_cast<Triangle*>(p)->s );
+				case TRIANGLE:
+					triangles.push_back( static_cast<Triangle_t*>(p)->s );
 					primitives.push_back( 1 );
 					primitives.push_back( triangles.size() - 1 );
 					break;
-				case Rectangle_t:
-					//For some reason this causes the opengl interop to freak out
-					//rectangles.push_back( static_cast<Rectangle*>(p)->s );
-					//primitives.push_back( 2 );
-					//primitives.push_back( rectangles.size() - 1 );
-					break;
-				case Quadrilateral_t:
-					quads.push_back( static_cast<Quadrilateral*>(p)->s );
+				case QUADRILATERAL:
+					quads.push_back( static_cast<Quadrilateral_t*>(p)->s );
 					primitives.push_back( 3 );
 					primitives.push_back( quads.size() - 1 );
 					break;
-				case AAB_t:
-					AABs.push_back( static_cast<AAB*>(p)->s );
+				case AAB:
+					AABs.push_back( static_cast<AAB_t*>(p)->s );
 					primitives.push_back( 4 );
 					primitives.push_back( AABs.size() - 1 );
 					break;
-				case Box_t:
-					boxes.push_back( static_cast<Box*>(p)->s );
+				case BOX:
+					boxes.push_back( static_cast<Box_t*>(p)->s );
 					primitives.push_back( 5 );
 					primitives.push_back( boxes.size() - 1 );
 					break;
@@ -583,12 +566,52 @@ void* RTContext::trace( unsigned width, unsigned height )
 				U, V, W);
 	
 	
-	if(devices.size()){
+	if(devices.size() && dirty){
 		updateDevices();
 		return devices[0].trace( width, height, U, -V, W, eye );
+		dirty = false;
 	}
 	dprintf( 1, "Attempted to trace without a device to trace on!\n" );
 	return NULL;
+}
+
+void RTContext::select( int x, int y, unsigned width, unsigned height )
+{
+	float3 a2, a3;
+	
+	if(x < 0 || y < 0)
+	{
+		dprintf( 2, "Attempted to select negative coordinates: %d, %d\n", x, y );
+		return;
+	}
+	
+	a2 = eye + spheric(angles);
+	a3 = spheric( make_float2( angles.x, angles.y - M_PI/2.f ) );
+	
+	float3 U, V, W;
+	
+	
+	calculateCameraVariables( eye, a2, a3, 45,
+				float(width) / float(height),
+				U, V, W);
+
+	float2 d1 = {float(x), float(y)};
+	float2 d2 = {float(width), float(height)};
+	float2 d = d1 / d2 * 2.f - 1.f;
+	float3 ray_origin = eye;
+	float3 ray_direction = normalize(d.x*U + d.y*V + W);
+	Ray ray = make_ray(ray_origin, ray_direction, 0, RT_DEFAULT_MIN, RT_DEFAULT_MAX);
+	selectedObject = selectTrace(ray, geometry);
+	if(selectedObject >= 0){
+		assert( selectedObject < geometry.size() );
+		geometry[ selectedObject ] -> select( );
+	}
+}
+
+void RTContext::deselect( void )
+{
+	if( selectedObject >= 0 )geometry[ selectedObject ] -> deselect( );
+	selectedObject = -1;
 }
 
 void RTContext::step( float mod )
@@ -604,8 +627,51 @@ void RTContext::strafe( float mod )
 	eye = eye + direction;
 }
 
-void RTContext::mouse( int x, int y )
+void RTContext::rmouse( int x, int y, bool ctrl, bool shift, bool alt )
 {
 	angles.x += 0.01f * float(x);
-	angles.y += 0.01f * float(y);
+	angles.y -= 0.01f * float(y);
+}
+
+void RTContext::lmouse( int x, int y, bool ctrl, bool shift, bool alt )
+{
+	if(selectedObject>=0)
+	{
+		float3 d;
+
+		if(alt)
+		{
+			d = make_float3( 0.f, float(x) + float(y), 0.f );
+			
+		}
+		else
+		{
+			float3 direction;
+			float dx, dz;
+			dx = -float(x);
+			dz = float(y);
+			direction = spheric( make_float2(angles.x - M_PI/2.f, angles.y) );
+			direction.y = 0.f;
+			d = dx*normalize(direction);
+			direction = spheric( make_float2(angles.x, angles.y) );
+			direction.y = 0.f;
+			d+= dz*normalize(direction);
+		}
+	
+		geometry[ selectedObject ] -> move( d / 100.f );
+	}
+}
+
+RTContext::RTContext( void )
+{
+	eye = make_float3( 2, 1, 0 );
+	angles = make_float2( 1.52f, 1.81f );
+	selectedObject = -1;
+	dirty = true;
+}
+
+unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
+{
+	devices.push_back( dcontext );
+	return devices.size();
 }

@@ -1,8 +1,6 @@
 #ifndef vtypes_h
 #define vtypes_h
 #include <math.h>
-#include <CL/cl.h>
-#include <CL/cl_platform.h>
 /* float2 functions */
 /******************************************************************************/
 
@@ -10,16 +8,15 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// Use opencl types to guarantee being spatially identical.
-typedef cl_float2 float2;
-typedef cl_float3 float3;
-typedef cl_float4 float4;
-typedef cl_int2 int2;
-typedef cl_int3 int3;
-typedef cl_int4 int4;
-typedef cl_uint2 uint2;
-typedef cl_uint3 uint3;
-typedef cl_uint4 uint4;
+typedef struct{ float x; float y; } float2;
+typedef struct{ float x; float y; float z; float dummy; } float3;
+typedef struct{ float x; float y; float z; float w; } float4;
+typedef struct{ int x; int y; } int2;
+typedef struct{ int x; int y; int z; } int3;
+typedef struct{ int x; int y; int z; int w; } int4;
+typedef struct{ unsigned int x; unsigned int y; } uint2;
+typedef struct{ unsigned int x; unsigned int y; unsigned int z; } uint3;
+typedef struct{ unsigned int x; unsigned int y; unsigned int z; unsigned int w; } uint4;
 
 inline float fminf( float a, float b )
 {
@@ -233,6 +230,202 @@ inline float2 expf(const float2& v)
 
 
 
+/* float3 functions */
+/******************************************************************************/
+
+/* constructors */
+inline float3 make_float3(const float a1, const float a2, const float a3)
+{
+	float3 f3 = {a1, a2, a3};
+	return f3;
+}
+
+inline float3 make_float3(const float s)
+{
+ return make_float3(s, s, s);
+}
+inline float3 make_float3(const float2& a)
+{
+ return make_float3(a.x, a.y, 0.0f);
+}
+inline float3 make_float3(const int3& a)
+{
+ return make_float3(float(a.x), float(a.y), float(a.z));
+}
+inline float3 make_float3(const uint3& a)
+{
+ return make_float3(float(a.x), float(a.y), float(a.z));
+}
+
+/* negate */
+inline float3 operator-(const float3& a)
+{
+ return make_float3(-a.x, -a.y, -a.z);
+}
+
+/* min */
+inline float3 fminf(const float3& a, const float3& b)
+{
+	return make_float3(fminf(a.x,b.x), fminf(a.y,b.y), fminf(a.z,b.z));
+}
+inline float fminf(const float3& a)
+{
+ return fminf(fminf(a.x, a.y), a.z);
+}
+
+/* max */
+inline float3 fmaxf(const float3& a, const float3& b)
+{
+	return make_float3(fmaxf(a.x,b.x), fmaxf(a.y,b.y), fmaxf(a.z,b.z));
+}
+inline float fmaxf(const float3& a)
+{
+ return fmaxf(fmaxf(a.x, a.y), a.z);
+}
+
+/* add */
+inline float3 operator+(const float3& a, const float3& b)
+{
+ return make_float3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+inline float3 operator+(const float3& a, const float b)
+{
+ return make_float3(a.x + b, a.y + b, a.z + b);
+}
+inline float3 operator+(const float a, const float3& b)
+{
+ return make_float3(a + b.x, a + b.y, a + b.z);
+}
+inline void operator+=(float3& a, const float3& b)
+{
+ a.x += b.x; a.y += b.y; a.z += b.z;
+}
+
+/* subtract */
+inline float3 operator-(const float3& a, const float3& b)
+{
+ return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+inline float3 operator-(const float3& a, const float b)
+{
+ return make_float3(a.x - b, a.y - b, a.z - b);
+}
+inline float3 operator-(const float a, const float3& b)
+{
+ return make_float3(a - b.x, a - b.y, a - b.z);
+}
+inline void operator-=(float3& a, const float3& b)
+{
+ a.x -= b.x; a.y -= b.y; a.z -= b.z;
+}
+
+/* multiply */
+inline float3 operator*(const float3& a, const float3& b)
+{
+ return make_float3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+inline float3 operator*(const float3& a, const float s)
+{
+ return make_float3(a.x * s, a.y * s, a.z * s);
+}
+inline float3 operator*(const float s, const float3& a)
+{
+ return make_float3(a.x * s, a.y * s, a.z * s);
+}
+inline void operator*=(float3& a, const float3& s)
+{
+ a.x *= s.x; a.y *= s.y; a.z *= s.z;
+}
+inline void operator*=(float3& a, const float s)
+{
+ a.x *= s; a.y *= s; a.z *= s;
+}
+
+/* divide */
+inline float3 operator/(const float3& a, const float3& b)
+{
+ return make_float3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+inline float3 operator/(const float3& a, const float s)
+{
+ float inv = 1.0f / s;
+ return a * inv;
+}
+inline float3 operator/(const float s, const float3& a)
+{
+ return make_float3( s/a.x, s/a.y, s/a.z );
+}
+inline void operator/=(float3& a, const float s)
+{
+ float inv = 1.0f / s;
+ a *= inv;
+}
+
+/* lerp */
+inline float3 lerp(const float3& a, const float3& b, const float t)
+{
+ return a + t*(b-a);
+}
+
+/* bilerp */
+inline float3 bilerp(const float3& x00, const float3& x10, const float3& x01, const float3& x11,
+                     const float u, const float v)
+{
+ return lerp( lerp( x00, x10, u ), lerp( x01, x11, u ), v );
+}
+
+/* dot product */
+inline float dot(const float3& a, const float3& b)
+{
+ return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+/* cross product */
+inline float3 cross(const float3& a, const float3& b)
+{
+ return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
+}
+
+/* length */
+inline float length(const float3& v)
+{
+ return sqrtf(dot(v, v));
+}
+
+/* normalize */
+inline float3 normalize(const float3& v)
+{
+ float invLen = 1.0f / sqrtf(dot(v, v));
+ return v * invLen;
+}
+
+/* floor */
+inline float3 floor(const float3& v)
+{
+ return make_float3(::floorf(v.x), ::floorf(v.y), ::floorf(v.z));
+}
+
+/* reflect */
+inline float3 reflect(const float3& i, const float3& n)
+{
+	return i - 2.0f * n * dot(n,i);
+}
+
+/* faceforward */
+/* Returns N if dot(i, nref) > 0; else -N; */
+/* Typical usage is N = faceforward(N, -ray.dir, N); */
+/* Note that this is opposite of what faceforward does in Cg and GLSL */
+inline float3 faceforward(const float3& n, const float3& i, const float3& nref)
+{
+ return n * copysignf( 1.0f, dot(i, nref) );
+}
+
+/* exp */
+inline float3 expf(const float3& v)
+{
+ return make_float3(::expf(v.x), ::expf(v.y), ::expf(v.z));
+}
+
 
 
 /* float4 functions */
@@ -411,95 +604,6 @@ inline float4 expf(const float4& v)
  return make_float4(::expf(v.x), ::expf(v.y), ::expf(v.z), ::expf(v.w));
 }
 
-/* float3 functions */
-/******************************************************************************/
-
-/* constructors */
-inline float3 make_float3(const float a1, const float a2, const float a3)
-{
-	float3 f3 = {a1, a2, a3};
-	return f3;
-}
-
-inline float3 make_float3(const float s)
-{
- return make_float3(s, s, s);
-}
-inline float3 make_float3(const float2& a)
-{
- return make_float3(a.x, a.y, 0.0f);
-}
-inline float3 make_float3(const int3& a)
-{
- return make_float3(float(a.x), float(a.y), float(a.z));
-}
-inline float3 make_float3(const uint3& a)
-{
- return make_float3(float(a.x), float(a.y), float(a.z));
-}
-
-
-/* min */
-inline float3 fminf3(const float3& a, const float3& b)
-{
-	return make_float3(fminf(a.x,b.x), fminf(a.y,b.y), fminf(a.z,b.z));
-}
-inline float fminf3(const float3& a)
-{
- return fminf(fminf(a.x, a.y), a.z);
-}
-
-/* max */
-inline float3 fmaxf3(const float3& a, const float3& b)
-{
-	return make_float3(fmaxf(a.x,b.x), fmaxf(a.y,b.y), fmaxf(a.z,b.z));
-}
-inline float fmaxf3(const float3& a)
-{
- return fmaxf(fmaxf(a.x, a.y), a.z);
-}
-
-
-/* dot product */
-inline float dot3(const float3& a, const float3& b)
-{
- return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-/* cross product */
-inline float3 cross(const float3& a, const float3& b)
-{
- return make_float3(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
-}
-
-/* length */
-inline float length3(const float3& v)
-{
- return sqrtf(dot(v, v));
-}
-
-/* normalize */
-inline float3 normalize3(const float3& v)
-{
- float invLen = 1.0f / sqrtf(dot(v, v));
- return v * invLen;
-}
-
-/* reflect */
-inline float3 reflect3(const float3& i, const float3& n)
-{
-	return i - 2.0f * n * dot(n,i);
-}
-
-/* faceforward */
-/* Returns N if dot(i, nref) > 0; else -N; */
-/* Typical usage is N = faceforward(N, -ray.dir, N); */
-/* Note that this is opposite of what faceforward does in Cg and GLSL */
-inline float3 faceforward3(const float3& n, const float3& i, const float3& nref)
-{
- return n * copysignf( 1.0f, dot(i, nref) );
-}
-
 
 /* int2 functions */
 /******************************************************************************/
@@ -607,6 +711,92 @@ inline int3 make_int3(const int s)
 inline int3 make_int3(const float3& a)
 {
  return make_int3(int(a.x), int(a.y), int(a.z));
+}
+
+/* negate */
+inline int3 operator-(const int3& a)
+{
+ return make_int3(-a.x, -a.y, -a.z);
+}
+
+/* min */
+inline int3 min(const int3& a, const int3& b)
+{
+ return make_int3(min(a.x,b.x), min(a.y,b.y), min(a.z,b.z));
+}
+
+/* max */
+inline int3 max(const int3& a, const int3& b)
+{
+ return make_int3(max(a.x,b.x), max(a.y,b.y), max(a.z,b.z));
+}
+
+/* add */
+inline int3 operator+(const int3& a, const int3& b)
+{
+ return make_int3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+inline void operator+=(int3& a, const int3& b)
+{
+ a.x += b.x; a.y += b.y; a.z += b.z;
+}
+
+/* subtract */
+inline int3 operator-(const int3& a, const int3& b)
+{
+ return make_int3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline void operator-=(int3& a, const int3& b)
+{
+ a.x -= b.x; a.y -= b.y; a.z -= b.z;
+}
+
+/* multiply */
+inline int3 operator*(const int3& a, const int3& b)
+{
+ return make_int3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+inline int3 operator*(const int3& a, const int s)
+{
+ return make_int3(a.x * s, a.y * s, a.z * s);
+}
+inline int3 operator*(const int s, const int3& a)
+{
+ return make_int3(a.x * s, a.y * s, a.z * s);
+}
+inline void operator*=(int3& a, const int s)
+{
+ a.x *= s; a.y *= s; a.z *= s;
+}
+
+/* divide */
+inline int3 operator/(const int3& a, const int3& b)
+{
+ return make_int3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+inline int3 operator/(const int3& a, const int s)
+{
+ return make_int3(a.x / s, a.y / s, a.z / s);
+}
+inline int3 operator/(const int s, const int3& a)
+{
+ return make_int3(s /a.x, s / a.y, s / a.z);
+}
+inline void operator/=(int3& a, const int s)
+{
+ a.x /= s; a.y /= s; a.z /= s;
+}
+
+/* equality */
+inline bool operator==(const int3& a, const int3& b)
+{
+ return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool operator!=(const int3& a, const int3& b)
+{
+ return a.x != b.x || a.y != b.y || a.z != b.z;
 }
 
 
@@ -818,6 +1008,86 @@ inline uint3 make_uint3(const float3& a)
  return make_uint3((unsigned int)a.x, (unsigned int)a.y, (unsigned int)a.z);
 }
 
+/* min */
+inline uint3 min(const uint3& a, const uint3& b)
+{
+ return make_uint3(min(a.x,b.x), min(a.y,b.y), min(a.z,b.z));
+}
+
+/* max */
+inline uint3 max(const uint3& a, const uint3& b)
+{
+ return make_uint3(max(a.x,b.x), max(a.y,b.y), max(a.z,b.z));
+}
+
+/* add */
+inline uint3 operator+(const uint3& a, const uint3& b)
+{
+ return make_uint3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+inline void operator+=(uint3& a, const uint3& b)
+{
+ a.x += b.x; a.y += b.y; a.z += b.z;
+}
+
+/* subtract */
+inline uint3 operator-(const uint3& a, const uint3& b)
+{
+ return make_uint3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+inline void operator-=(uint3& a, const uint3& b)
+{
+ a.x -= b.x; a.y -= b.y; a.z -= b.z;
+}
+
+/* multiply */
+inline uint3 operator*(const uint3& a, const uint3& b)
+{
+ return make_uint3(a.x * b.x, a.y * b.y, a.z * b.z);
+}
+inline uint3 operator*(const uint3& a, const unsigned int s)
+{
+ return make_uint3(a.x * s, a.y * s, a.z * s);
+}
+inline uint3 operator*(const unsigned int s, const uint3& a)
+{
+ return make_uint3(a.x * s, a.y * s, a.z * s);
+}
+inline void operator*=(uint3& a, const unsigned int s)
+{
+ a.x *= s; a.y *= s; a.z *= s;
+}
+
+/* divide */
+inline uint3 operator/(const uint3& a, const uint3& b)
+{
+ return make_uint3(a.x / b.x, a.y / b.y, a.z / b.z);
+}
+inline uint3 operator/(const uint3& a, const unsigned int s)
+{
+ return make_uint3(a.x / s, a.y / s, a.z / s);
+}
+inline uint3 operator/(const unsigned int s, const uint3& a)
+{
+ return make_uint3(s / a.x, s / a.y, s / a.z);
+}
+inline void operator/=(uint3& a, const unsigned int s)
+{
+ a.x /= s; a.y /= s; a.z /= s;
+}
+
+/* equality */
+inline bool operator==(const uint3& a, const uint3& b)
+{
+ return a.x == b.x && a.y == b.y && a.z == b.z;
+}
+
+inline bool operator!=(const uint3& a, const uint3& b)
+{
+ return a.x != b.x || a.y != b.y || a.z != b.z;
+}
+
 
 /* uint4 functions */
 /******************************************************************************/
@@ -921,11 +1191,13 @@ inline bool operator!=(const uint4& a, const uint4& b)
 
 /* Narrowing */
 
-
+inline int2 make_int2(const int3& v0) { return make_int2( v0.x, v0.y ); }
 inline int2 make_int2(const int4& v0) { return make_int2( v0.x, v0.y ); }
 inline int3 make_int3(const int4& v0) { return make_int3( v0.x, v0.y, v0.z ); }
+inline uint2 make_uint2(const uint3& v0) { return make_uint2( v0.x, v0.y ); }
 inline uint2 make_uint2(const uint4& v0) { return make_uint2( v0.x, v0.y ); }
 inline uint3 make_uint3(const uint4& v0) { return make_uint3( v0.x, v0.y, v0.z ); }
+inline float2 make_float2(const float3& v0) { return make_float2( v0.x, v0.y ); }
 inline float2 make_float2(const float4& v0) { return make_float2( v0.x, v0.y ); }
 inline float3 make_float3(const float4& v0) { return make_float3( v0.x, v0.y, v0.z ); }
 

@@ -4,6 +4,7 @@
 
 #include "gfx_glfw.h"
 #include "control.h"
+#include "clstuff.h"
 
 class GlfwControl: public Control
 {
@@ -13,6 +14,7 @@ class GlfwControl: public Control
 	bool d;
 	bool shift;
 	bool ctrl;
+	bool alt;
 	bool lmouse;
 	bool rmouse;
 	int ox;
@@ -21,8 +23,8 @@ class GlfwControl: public Control
 	int ny;
 	
 	Glfwgfx* gfx;
-	
 	public:
+	void mouseCall( int button, int action, int mods );
 	GlfwControl( RTContext* rtcontext, Glfwgfx* gfx );
 	void keyboardAction( void );
 	void mouseAction( void );

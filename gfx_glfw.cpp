@@ -7,8 +7,9 @@ static void error_callback(int error, const char* description)
 }
 
 
-Glfwgfx::Glfwgfx( unsigned width, unsigned height )
+Glfwgfx::Glfwgfx( unsigned width, unsigned height, RTContext* context )
 {
+	this->context = context;
 	static bool engine_initialized = false;
 	glfwSetErrorCallback(error_callback);
 	if( !engine_initialized )

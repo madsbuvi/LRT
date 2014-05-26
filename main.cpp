@@ -5,12 +5,11 @@
 #include <stdio.h>
 #include <chrono>
 #include <thread>
+#include "common.h"
 #include "debug.h"
 #include "clstuff.h"
 #include "geometry.h"
-#include "gfx_sdl.h"
 #include "gfx_glfw.h"
-#include "control_sdl.h"
 #include "control_glfw.h"
 #include "shaders.h"
 #include "util.h"
@@ -36,7 +35,7 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 	context = new RTContext();
-	graphics = new Glfwgfx( WIDTH, HEIGHT );
+	graphics = new Glfwgfx( WIDTH, HEIGHT, context );
 	control = new GlfwControl( context, graphics );
 	DeviceContext device( 0, graphics->getWindow() );
 	context->registerDeviceContext( device );
@@ -56,267 +55,270 @@ int main(int argc, char *argv[])
 
 	forrange2( i, 0, 3, j, 0, 3 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i)*4.f, -1.f, float(j)*4.f ), make_float3( float(i+1)*4.f, 0.f, float(j+1)*4.f ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i)*4.f, -1.f, float(j)*4.f ), make_float3( float(i+1)*4.f, 0.f, float(j+1)*4.f ) ),
 							new SimpleDiffusionShaderTex( L3Dredbase ) );
 	}
 	forrange2( i, 2, 9, j, 2, 9 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), 0.f, float(j) ), make_float3( float(i+1), 1.f, float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), 0.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dblue ) );
 	}
 	forrange2( i, 3, 8, j, 3, 8 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), 1.f, float(j) ), make_float3( float(i+1), 2.f, float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), 1.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dblue ) );
 	}
 	forrange2( i, 3, 5, j, 3, 8 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), 2.f, float(j) ), make_float3( float(i+1), 3.f, float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), 2.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dblue ) );
 	}
 	forrange2( i, 5, 9, j, 3, 8 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), 2.f, float(j) ), make_float3( float(i+1), 3.f, float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), 2.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange3( i, 2, 9, j, 2, 9, k, 4, 9 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), float(k), float(j) ), make_float3( float(i+1), float(k+1), float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(k), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange2( i, 4, 9, j, 2, 9)
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), float(3), float(j) ), make_float3( float(i+1), float(3+1), float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(3), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+	
 	forrange( i, 3, 8 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(3), float(3), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(3), float(3), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
-	
 	forrange3( i, 3, 8, j, 0, 2, k, 3, 7 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), float(k), float(j) ), make_float3( float(i+1), float(k+1), float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(k), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
 	forrange3( i, 3, 8, j, 9, 11, k, 3, 7 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), float(k), float(j) ), make_float3( float(i+1), float(k+1), float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(k), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
 	forrange3( i, -1, 3, j, 3, 8, k, 3, 6 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), float(k), float(j) ), make_float3( float(i+1), float(k+1), float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(k), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(0), float(6), float(i) ), make_float3( float(1), float(7), float(i+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(0), float(6), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(-2), float(3), float(i) ), make_float3( float(-1), float(4), float(i+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(-2), float(3), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange2( i, -1, 3, j, 4, 7 )
 	{
-		context->addGeometry( make_AAB( make_float3( float(i), 2.f, float(j) ), make_float3( float(i+1), 3.f, float(j+1) ) ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), 2.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
-	context->addGeometry( make_AAB( make_float3( float(-1), float(6), float(5) ), make_float3( float(0), float(7), float(6) ) ),
+	context->addGeometry( new Geometry_AAB( make_float3( float(-1), float(6), float(5) ) ),
 						new SimpleDiffusionShaderTex( L3Dbrown ) );
+	
+	
 	forrange2( i, -1, 2, j, 4, 7 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(i), float(7), float(j) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(7), float(j) ) ),
 						new SimpleDiffusionShaderTex( L3Dgreen) );
 	}
 	forrange2( i, 0, 2, j, 4, 7 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(i), float(8), float(j) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(8), float(j) ) ),
 						new SimpleDiffusionShaderTex( L3Dgreen) );
 	}
 	forrange2( i, 1, 2, j, 4, 7 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(i), float(9), float(j) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(9), float(j) ) ),
 						new SimpleDiffusionShaderTex( L3Dgreen) );
 	}
 	forrange2( i, 2, 7, j, 4, 8 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(i), float(10), float(j) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(10), float(j) ) ),
 						new SimpleDiffusionShaderTex( L3Dgreen) );
 	}
 	forrange2( i, 2, 7, j, 2, 8 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(i), float(9), float(j) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(9), float(j) ) ),
 						new SimpleDiffusionShaderTex( L3Dgreen) );
 	}
 	forrange( i, 6, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(1), float(i), float(7) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(1), float(i), float(7) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 6, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(1), float(i), float(3) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(1), float(i), float(3) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+	
 	forrange( i, 6, 9 )
 	{
-		context->addGeometry( make_AAPrism_SW( make_float3( float(1), float(i), float(2) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(1), float(i), float(2) ), SW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 7, 9 )
 	{
-		context->addGeometry( make_AAPrism_SW( make_float3( float(0), float(i), float(3) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(0), float(i), float(3) ), SW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 6, 9 )
 	{
-		context->addGeometry( make_AAPrism_SE( make_float3( float(1), float(i), float(8) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(1), float(i), float(8) ), SE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 7, 9 )
 	{
-		context->addGeometry( make_AAPrism_SE( make_float3( float(0), float(i), float(7) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(0), float(i), float(7) ), SE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 
 	forrange( i, 3, 7 )
 	{
-		context->addGeometry( make_AAPrism_UW( make_float3( float(i), float(4), float(-1) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(4), float(-1) ), UW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 3, 7 )
 	{
-		context->addGeometry( make_AAPrism_DW( make_float3( float(i), float(3), float(-1) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(3), float(-1) ), DW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 3, 7 )
 	{
-		context->addGeometry( make_AAPrism_DW( make_float3( float(i), float(2), float(0) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(0) ), DW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 3, 7 )
 	{
-		context->addGeometry( make_AAPrism_DE( make_float3( float(i), float(2), float(1) ), 1.f ),
-							new SimpleDiffusionShaderTex( L3Dgreen ) );
-	}
-	
-
-	forrange( i, 3, 7 )
-	{
-		context->addGeometry( make_AAPrism_UE( make_float3( float(i), float(4), float(11) ), 1.f ),
-							new SimpleDiffusionShaderTex( L3Dgreen ) );
-	}
-	forrange( i, 3, 7 )
-	{
-		context->addGeometry( make_AAPrism_DE( make_float3( float(i), float(3), float(11) ), 1.f ),
-							new SimpleDiffusionShaderTex( L3Dgreen ) );
-	}
-	forrange( i, 3, 7 )
-	{
-		context->addGeometry( make_AAPrism_DW( make_float3( float(i), float(2), float(9) ), 1.f ),
-							new SimpleDiffusionShaderTex( L3Dgreen ) );
-	}
-	forrange( i, 3, 7 )
-	{
-		context->addGeometry( make_AAPrism_DE( make_float3( float(i), float(2), float(10) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(1) ), DE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
 	
+	forrange( i, 3, 7 )
+	{
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(4), float(11) ), UE ),
+							new SimpleDiffusionShaderTex( L3Dgreen ) );
+	}
+	forrange( i, 3, 7 )
+	{
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(3), float(11) ), DE ),
+							new SimpleDiffusionShaderTex( L3Dgreen ) );
+	}
+	forrange( i, 3, 7 )
+	{
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(9) ), DW ),
+							new SimpleDiffusionShaderTex( L3Dgreen ) );
+	}
+	forrange( i, 3, 7 )
+	{
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(10) ), DE ),
+							new SimpleDiffusionShaderTex( L3Dgreen ) );
+	}
+	
+	
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAPrism_US( make_float3( float(-2), float(4), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(-2), float(4), float(i) ), US ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAPrism_DS( make_float3( float(-2), float(2), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(-2), float(2), float(i) ), DS ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAPrism_DS( make_float3( float(-1), float(1), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(-1), float(1), float(i) ), DS ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAPrism_DN( make_float3( float(1), float(1), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(1), float(1), float(i) ), DN ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(0), float(1), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(0), float(1), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, -1, 3 )
 	{
-		context->addGeometry( make_AAPrism_DW( make_float3( float(i), float(2), float(3) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(3) ), DW ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	forrange( i, -1, 3 )
 	{
-		context->addGeometry( make_AAPrism_DE( make_float3( float(i), float(2), float(7) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(i), float(2), float(7) ), DE ),
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	
 	forrange( i, 3, 8 )
 	{
-		context->addGeometry( make_AAPrism_DN( make_float3( float(9), float(2), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(9), float(2), float(i) ), DN ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 4, 7 )
 	{
-		context->addGeometry( make_AAPrism_DN( make_float3( float(10), float(3), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(10), float(3), float(i) ), DN ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
 	
 	forrange2( i, 3, 8, j, 3, 8 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(9), float(j), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(9), float(j), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange2( i, 4, 7, j, 4, 8 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(10), float(j), float(i) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(10), float(j), float(i) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 4, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(8), float(i), float(1) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(8), float(i), float(1) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 5, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(9), float(i), float(2) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(9), float(i), float(2) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 4, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(8), float(i), float(9) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(8), float(i), float(9) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 5, 9 )
 	{
-		context->addGeometry( make_AAB1s( make_float3( float(9), float(i), float(8) ), 1.f ),
+		context->addGeometry( new Geometry_AAB( make_float3( float(9), float(i), float(8) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 4, 8 )
 	{
-		context->addGeometry( make_AAPrism_NW( make_float3( float(10), float(i), float(3) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(10), float(i), float(3) ), NW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	forrange( i, 4, 8 )
 	{
-		context->addGeometry( make_AAPrism_NE( make_float3( float(10), float(i), float(7) ), 1.f ),
+		context->addGeometry( new Geometry_AAP( make_float3( float(10), float(i), float(7) ), NE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
@@ -337,7 +339,7 @@ int main(int argc, char *argv[])
 		}
 		glfwPollEvents();
 		double elapsed = control->timeMillis() - start;
-		if(unsigned(frames)%100==0)printf("Fps averaging to %g/s\r", (frames / elapsed)*1000.);
+		if(unsigned(frames)%10==0)printf("Fps averaging to %g/s\r", (frames / elapsed)*1000.);
 	}
 	
 	return 0;

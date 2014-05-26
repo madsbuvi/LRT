@@ -19,15 +19,26 @@ void Geometry_AAB::writeOff( FILE* fp )
 void Geometry_AAP::writeOff( FILE* fp )
 {
 }
+void Pyramid::writeOff( FILE* fp )
+{
+}
+
+void Geometry::clearPrimitives( void ){
+	for( Primitive* p: primitives )
+	{
+		p->~Primitive();
+	}
+	primitives.clear( );
+}
 
 
 
 Pyramid::Pyramid( float3 v1, float3 v2, float3 v3, float3 v4, float3 apex ){
-	Quadrilateral* base = new Quadrilateral( v1, v2, v3, v4 );
-	Triangle* s1 = new Triangle( v1, v2, apex );
-	Triangle* s2 = new Triangle( v2, v3, apex );
-	Triangle* s3 = new Triangle( v3, v4, apex );
-	Triangle* s4 = new Triangle( v4, v1, apex );
+	Quadrilateral_t* base = new Quadrilateral_t( v1, v2, v3, v4 );
+	Triangle_t* s1 = new Triangle_t( v1, v2, apex );
+	Triangle_t* s2 = new Triangle_t( v2, v3, apex );
+	Triangle_t* s3 = new Triangle_t( v3, v4, apex );
+	Triangle_t* s4 = new Triangle_t( v4, v1, apex );
 	addPrimitive( base );
 	addPrimitive( s1 );
 	addPrimitive( s2 );
@@ -37,168 +48,166 @@ Pyramid::Pyramid( float3 v1, float3 v2, float3 v3, float3 v4, float3 apex ){
 
 Geometry* make_sphere( float3 c, float r )
 {
-	Sphere* p = new Sphere( c, r );
+	Sphere_t* p = new Sphere_t( c, r );
 	return new Geometry_Generic( p );
 }
 
 Geometry* make_triangle( float3 v1, float3 v2, float3 v3 )
 {
-	Triangle* p = new Triangle( v1, v2, v3 );
-	return new Geometry_Generic( p );
-}
-
-Geometry* make_rectangle( float3 bmin, float3 s1, float3 s2 )
-{
-	Rectangle* p = new Rectangle( bmin, s1, s2 );
+	Triangle_t* p = new Triangle_t( v1, v2, v3 );
 	return new Geometry_Generic( p );
 }
 
 Geometry* make_quadrilateral( float3 v1, float3 v2, float3 v3, float3 v4 )
 {
-	Quadrilateral* p = new Quadrilateral( v1, v2, v3, v4 );
-	return new Geometry_Generic( p );
-}
-
-Geometry* make_AAB( float3 bmin, float3 bmax )
-{
-	AAB* p = new AAB( bmin, bmax );
+	Quadrilateral_t* p = new Quadrilateral_t( v1, v2, v3, v4 );
 	return new Geometry_Generic( p );
 }
 
 Geometry* make_box( float3 s1, float3 s2, float3 s3, float h )
 {
-	Box* p = new Box( s1, s2, s3, h );
+	Box_t* p = new Box_t( s1, s2, s3, h );
 	return new Geometry_Generic( p );
 }
 
-
-Geometry* make_AAPrism( float3 v1, float3 v2, float3 v5 )
+void Geometry_AAP::make_AAPrismFlip( float3 v1, float3 v2, float3 v5 )
 {
 	float3 v3, v4, v6;
-	Geometry* g = new Geometry_AAP();
-	v3 = make_float3( v5.x, v1.y, v5.z );
-	v4 = v3 + v2 - v1;
-	v6 = make_float3( v4.x, v5.y, v4.z );
-	Triangle* s1 = new Triangle( v1, v3, v5 );
-	g->addPrimitive( s1 );
-	Triangle* s2 = new Triangle( v2, v4, v6 );
-	g->addPrimitive( s2 );
-	
-	Triangle* r1 = new Triangle( v1, v2, v5 );
-	g->addPrimitive( r1 );
-	Triangle* r2 = new Triangle( v2, v5, v6 );
-	g->addPrimitive( r2 );
-	
-	Triangle* b1 = new Triangle( v1, v2, v3 );
-	g->addPrimitive( b1 );
-	Triangle* b2 = new Triangle( v2, v3, v4 );
-	g->addPrimitive( b2 );
-	Triangle* w1 = new Triangle( v3, v4, v5 );
-	g->addPrimitive( w1 );
-	Triangle* w2 = new Triangle( v4, v5, v6 );
-	g->addPrimitive( w2 );
-	return g;
-}
-Geometry* make_AAB1( float3 bmin )
-{
-	AAB* p = new AAB( bmin, make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+1.f ) );
-	return new Geometry_Generic( p );
-}
-Geometry* make_AAB1s( float3 bmin, float scale )
-{
-	AAB* p = new AAB( bmin, make_float3( bmin.x+scale, bmin.y+scale, bmin.z+scale ) );
-	return new Geometry_Generic( p );
-}
-
-Geometry* make_AAPrism_UN( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z ), make_float3( bmin.x, bmin.y+h, bmin.z+1.f ) );
-}
-
-Geometry* make_AAPrism_US( float3 bmin, float h )
-{
-	return make_AAPrism( bmin, make_float3( bmin.x, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+h, bmin.z ) );
-}
-
-Geometry* make_AAPrism_UE( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ), make_float3( bmin.x, bmin.y+h, bmin.z ) );
-}
-
-Geometry* make_AAPrism_UW( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x+1.f, bmin.y, bmin.z), bmin, make_float3( bmin.x+1.f, bmin.y+h, bmin.z+1.f ) );
-}
-
-
-Geometry* make_AAPrism_DN( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x+1.f, bmin.y+h, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+h, bmin.z ), make_float3( bmin.x, bmin.y, bmin.z+1.f ) );
-}
-
-Geometry* make_AAPrism_DS( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x, bmin.y+h, bmin.z ), make_float3( bmin.x, bmin.y+h, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z ) );
-}
-
-Geometry* make_AAPrism_DE( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x, bmin.y+h, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+h, bmin.z+1.f ), bmin );
-}
-
-Geometry* make_AAPrism_DW( float3 bmin, float h )
-{
-	return make_AAPrism( make_float3( bmin.x+1.f, bmin.y+h, bmin.z), make_float3( bmin.x, bmin.y+h, bmin.z ), make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ) );
-}
-
-
-
-Geometry* make_AAPrismFlip( float3 v1, float3 v2, float3 v5 )
-{
-	float3 v3, v4, v6;
-	Geometry* g = new Geometry_AAP();
 	v3 = make_float3( v1.x, v5.y, v5.z );
 	v4 = v3 + v2 - v1;
 	v6 = make_float3( v5.x, v4.y, v4.z );
-	Triangle* s1 = new Triangle( v1, v3, v5 );
-	g->addPrimitive( s1 );
-	Triangle* s2 = new Triangle( v2, v4, v6 );
-	g->addPrimitive( s2 );
+	Triangle_t* s1 = new Triangle_t( v1, v3, v5 );
+	addPrimitive( s1 );
+	Triangle_t* s2 = new Triangle_t( v2, v4, v6 );
+	addPrimitive( s2 );
 	
-	Triangle* r1 = new Triangle( v1, v2, v5 );
-	g->addPrimitive( r1 );
-	Triangle* r2 = new Triangle( v2, v5, v6 );
-	g->addPrimitive( r2 );
+	Triangle_t* r1 = new Triangle_t( v1, v2, v5 );
+	addPrimitive( r1 );
+	Triangle_t* r2 = new Triangle_t( v2, v5, v6 );
+	addPrimitive( r2 );
 	
-	Triangle* b1 = new Triangle( v1, v2, v3 );
-	g->addPrimitive( b1 );
-	Triangle* b2 = new Triangle( v2, v3, v4 );
-	g->addPrimitive( b2 );
-	Triangle* w1 = new Triangle( v3, v4, v5 );
-	g->addPrimitive( w1 );
-	Triangle* w2 = new Triangle( v4, v5, v6 );
-	g->addPrimitive( w2 );
+	Triangle_t* b1 = new Triangle_t( v1, v2, v3 );
+	addPrimitive( b1 );
+	Triangle_t* b2 = new Triangle_t( v2, v3, v4 );
+	addPrimitive( b2 );
+	Triangle_t* w1 = new Triangle_t( v3, v4, v5 );
+	addPrimitive( w1 );
+	Triangle_t* w2 = new Triangle_t( v4, v5, v6 );
+	addPrimitive( w2 );
+}
+
+void Geometry_AAP::make_AAPrism( float3 v1, float3 v2, float3 v5 )
+{
+	float3 v3, v4, v6;
+	v3 = make_float3( v5.x, v1.y, v5.z );
+	v4 = v3 + v2 - v1;
+	v6 = make_float3( v4.x, v5.y, v4.z );
+	Triangle_t* s1 = new Triangle_t( v1, v3, v5 );
+	addPrimitive( s1 );
+	Triangle_t* s2 = new Triangle_t( v2, v4, v6 );
+	addPrimitive( s2 );
 	
-	return g;
+	Triangle_t* r1 = new Triangle_t( v1, v2, v5 );
+	addPrimitive( r1 );
+	Triangle_t* r2 = new Triangle_t( v2, v5, v6 );
+	addPrimitive( r2 );
+	
+	Triangle_t* b1 = new Triangle_t( v1, v2, v3 );
+	addPrimitive( b1 );
+	Triangle_t* b2 = new Triangle_t( v2, v3, v4 );
+	addPrimitive( b2 );
+	Triangle_t* w1 = new Triangle_t( v3, v4, v5 );
+	addPrimitive( w1 );
+	Triangle_t* w2 = new Triangle_t( v4, v5, v6 );
+	addPrimitive( w2 );
 }
 
-
-Geometry* make_AAPrism_NW( float3 bmin, float h )
+std::vector<Primitive*>* Geometry::getPrimitives( void )
 {
-	return make_AAPrismFlip( make_float3( bmin.x, bmin.y, bmin.z), make_float3( bmin.x, bmin.y+1.f, bmin.z ), make_float3( bmin.x+1.f, bmin.y, bmin.z+h ) );
+	//printf("ConvokeB\n");
+	if(dirty)
+	{
+		buildPrimitives();
+		dirty = false;
+	}
+	return &primitives;
+}
+void Geometry_AAB::buildPrimitives( void )
+{
+	primitives.clear();
+	addPrimitive( new AAB_t( bmin, bmin + bmax_offset ) );
 }
 
-Geometry* make_AAPrism_SW( float3 bmin, float h )
+void Geometry_AAB::move( float3 d )
 {
-	return make_AAPrismFlip( make_float3( bmin.x+1.f, bmin.y, bmin.z ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z ), make_float3( bmin.x, bmin.y, bmin.z+h ) );
+	bmin += d;
+	dirty = true;
+}
+void Geometry_AAB::deselect( void )
+{
+	bmin = floor(bmin + 0.5f);
+	
+	dirty = true;
 }
 
-Geometry* make_AAPrism_SE( float3 bmin, float h )
+void Geometry_AAP::move( float3 d )
 {
-	return make_AAPrismFlip( make_float3( bmin.x+1.f, bmin.y, bmin.z+h ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+h ), make_float3( bmin.x, bmin.y, bmin.z ) );
+	bmin += d;
+	dirty = true;
+}
+void Geometry_AAP::deselect( void )
+{
+	bmin = floor(bmin + 0.5f);
+	
+	dirty = true;
 }
 
-Geometry* make_AAPrism_NE( float3 bmin, float h )
+void Geometry_AAP::buildPrimitives( void )
 {
-	return make_AAPrismFlip( make_float3( bmin.x, bmin.y, bmin.z+h), make_float3( bmin.x, bmin.y+1.f, bmin.z+h ), make_float3( bmin.x+1.f, bmin.y, bmin.z ) );
+	primitives.clear();
+	switch( o )
+	{
+		case UN:
+			make_AAPrism( make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z ), make_float3( bmin.x, bmin.y+1.f, bmin.z+1.f ) );
+			break;
+		case UW:
+			make_AAPrism( make_float3( bmin.x+1.f, bmin.y, bmin.z), bmin, make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+1.f ) );
+			break;
+		case US:
+			make_AAPrism( bmin, make_float3( bmin.x, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z ) );
+			break;
+		case UE:
+			make_AAPrism( make_float3( bmin.x, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ), make_float3( bmin.x, bmin.y+1.f, bmin.z ) );
+			break;
+		case DN:
+			make_AAPrism( make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z ), make_float3( bmin.x, bmin.y, bmin.z+1.f ) );
+			break;
+		case DW:
+			make_AAPrism( make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z), make_float3( bmin.x, bmin.y+1.f, bmin.z ), make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ) );
+			break;
+		case DS:
+			make_AAPrism( make_float3( bmin.x, bmin.y+1.f, bmin.z ), make_float3( bmin.x, bmin.y+1.f, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z ) );
+			break;
+		case DE:
+			make_AAPrism( make_float3( bmin.x, bmin.y+1.f, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+1.f ), bmin );
+			break;
+		case NW:
+			make_AAPrismFlip( make_float3( bmin.x, bmin.y, bmin.z), make_float3( bmin.x, bmin.y+1.f, bmin.z ), make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ) );
+			break;
+		case SW:
+			make_AAPrismFlip( make_float3( bmin.x+1.f, bmin.y, bmin.z ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z ), make_float3( bmin.x, bmin.y, bmin.z+1.f ) );
+			break;
+		case SE:
+			make_AAPrismFlip( make_float3( bmin.x+1.f, bmin.y, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y+1.f, bmin.z+1.f ), make_float3( bmin.x, bmin.y, bmin.z ) );
+			break;
+		case NE:
+			make_AAPrismFlip( make_float3( bmin.x, bmin.y, bmin.z+1.f), make_float3( bmin.x, bmin.y+1.f, bmin.z+1.f ), make_float3( bmin.x+1.f, bmin.y, bmin.z ) );
+			break;
+	}
+}
+
+Geometry_AAP::Geometry_AAP( float3 bmin, Orientation o )
+{
+	this->bmin = bmin;
+	this->o = o;
 }

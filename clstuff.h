@@ -6,29 +6,12 @@
 #include <stdint.h>
 #include "clutil.h"
 
-
-#ifdef _WIN32
-#include <windows.h>
-
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define GLFW_EXPOSE_NATIVE_WGL
-
-#endif
-
-#include "gfx_glfw.h"
-#include <GLFW/glfw3native.h>
-#include "vtypes.h"
-#include "geometry.h"
-#include "debug.h"
-
-
 #include <GL/glew.h>
-#include <CL/cl_gl.h>
-#ifndef _WIN32
-#include <GL/glx.h>
-#endif
-
-
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <GLFW/glfw3.h>
+#include "common.h"
+#include "geometry.h"
 
 
 struct Geometrydata
@@ -79,10 +62,10 @@ class DeviceContext
 	public:
 	DeviceContext( unsigned device, GLFWwindow* window );
 	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
-	void updateSpheres( std::vector<Sphere_struct>& spheres );
-	void updateTriangles( std::vector<Triangle_struct>& triangles );
-	void updateAABs( std::vector<AAB_struct>& AABs);
-	void updateBoxes( std::vector<Box_struct>& boxes );
+	void updateSpheres( std::vector<Sphere>& spheres );
+	void updateTriangles( std::vector<Triangle>& triangles );
+	void updateAABs( std::vector<AAB_s>& AABs);
+	void updateBoxes( std::vector<Box>& boxes );
 	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int>& primitives, std::vector<float>& shader_data );
 };
 
@@ -93,15 +76,22 @@ class RTContext
 	float3 eye;
 	float2 angles;
 	void updateDevices( void );
+	
+	int selectedObject;
+	bool dirty;
+	
 	public:
 	RTContext( void );
+	void select( int x, int y, unsigned width, unsigned height );
+	void deselect( void );
 	unsigned registerDeviceContext( DeviceContext dcontext );
 	int addGeometry( Geometry* g ){ geometry.push_back( g ); return geometry.size(); };
 	int addGeometry( Geometry* g, Shader* shader ){ g->setShader( shader ); geometry.push_back( g ); return geometry.size(); };
 	void* trace( unsigned width, unsigned height );
 	void step( float mod );
 	void strafe( float mod );
-	void mouse( int x, int y );
+	void rmouse( int x, int y, bool ctrl, bool shift, bool alt );
+	void lmouse( int x, int y, bool ctrl, bool shift, bool alt );
 	
 };
 

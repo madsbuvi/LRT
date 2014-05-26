@@ -14,7 +14,7 @@ class Glfwgfx: public Gfx
 {
 	GLFWwindow* window;
 	public:
-	Glfwgfx( unsigned width, unsigned height );
+	Glfwgfx( unsigned width, unsigned height, RTContext* context );
 	~Glfwgfx( void );
 	void blit( void* pixels, uint32_t width, uint32_t height );
 	void update( void );
