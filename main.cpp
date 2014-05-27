@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <chrono>
 #include <thread>
+#include <iostream>
 #include "common.h"
 #include "debug.h"
 #include "clstuff.h"
@@ -335,11 +336,12 @@ int main(int argc, char *argv[])
 		unsigned time = control->postactions( );
 		if( time < 10 )
 		{
-			//std::this_thread::sleep_for(std::chrono::milliseconds(10 - time));
+			std::this_thread::sleep_for(std::chrono::milliseconds(10 - time));
 		}
 		glfwPollEvents();
 		double elapsed = control->timeMillis() - start;
 		if(unsigned(frames)%10==0)printf("Fps averaging to %g/s\r", (frames / elapsed)*1000.);
+		fflush(stdout);
 	}
 	
 	return 0;

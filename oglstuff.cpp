@@ -1,6 +1,6 @@
 
 #include "oglstuff.h"
-#include <SOIL.h>
+#include <SOIL/SOIL.h>
 
 // I dropped interop but i kept this because i might decide to make various functions to load
 // textures directly into specific formats later. Whatever.

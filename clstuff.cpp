@@ -65,7 +65,7 @@ int clinit( void )
 		}
 	}
 	
-	dprintf( 1, "device_vector size: %d\n", device_vector.size() );
+	dprintf( 1, "device_vector size: %d\n", int(device_vector.size()) );
 	delete platform_ids;
 	
 	device_vector.shrink_to_fit();
@@ -603,7 +603,7 @@ void RTContext::select( int x, int y, unsigned width, unsigned height )
 	Ray ray = make_ray(ray_origin, ray_direction, 0, RT_DEFAULT_MIN, RT_DEFAULT_MAX);
 	selectedObject = selectTrace(ray, geometry);
 	if(selectedObject >= 0){
-		assert( selectedObject < geometry.size() );
+		assert( selectedObject < int(geometry.size()) );
 		geometry[ selectedObject ] -> select( );
 	}
 }

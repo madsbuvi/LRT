@@ -1,0 +1,31 @@
+CC = g++
+CFLAGS = -o3 -std=gnu++0x -pedantic -Wall -Wno-unused-function
+DEFS = -DDEBUG=10
+BFLAGS = --debug
+CLFLAGS = -I"/opt/AMDAPP/include" -L"/opt/AMDAPP/lib/x86_64" -L"."
+LFLAGS = -lOpenCL -lSOIL `pkg-config --libs glfw3` -lpthread -ldl -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lXi
+
+TARG = LemmingsRT
+OBJS = main.o clstuff.o gfx_glfw.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o host_tracer.o
+includes = $(wildcard *.h)
+
+
+all	: $(TARG)
+
+run : $(TARG)
+	$(TARG)
+
+%.c: %.y
+%.c: %.l
+%.o	: %.cpp $(includes)
+	$(CC) $(CFLAGS) $(CLFLAGS) $(DEFS) -c $<  -o $@
+
+%.o	: %.S
+	$(CC) $(CFLAGS) $(CLFLAGS) $(DEFS) -c $< -o $@
+
+$(TARG): $(OBJS) 
+	$(CC) $(CFLAGS) $(CLFLAGS) $(DEFS) -o $(TARG) $(OBJS) $(LFLAGS)
+
+	
+clean	:
+	rm -f $(OBJS) $(TARG) 

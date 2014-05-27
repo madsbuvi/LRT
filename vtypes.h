@@ -21,14 +21,6 @@ typedef cl_uint2 uint2;
 typedef cl_uint3 uint3;
 typedef cl_uint4 uint4;
 
-inline float fminf( float a, float b )
-{
-	return a < b ? a : b;
-}
-inline float fmaxf( float a, float b )
-{
-	return a > b ? a : b;
-}
 
 inline unsigned int min( unsigned int a, unsigned int b )
 {
