@@ -1,5 +1,8 @@
 #include <vector>
 #include <unordered_map>
+#include <Rocket/Core/Input.h>
+#include <Rocket/Core/Types.h>
+#include <Rocket/Core/SystemInterface.h>
 #include "control_glfw.h"
 
 
@@ -16,11 +19,17 @@ static void mouseCallBack( GLFWwindow* widnow, int button, int action, int mods 
 	}
 }
 
-GlfwControl::GlfwControl( RTContext* rtcontext, Glfwgfx* gfx )
+GlfwControl::GlfwControl( RTContext* rtcontext, Glfwgfx* gfx 
+#ifdef USE_ROCKET
+	,Rocket::Core::Context* rContext
+#endif
+)
 {
 	GLFWwindow* window = gfx->getWindow();
+	assert(window);
 	this->gfx = gfx;
 	context = rtcontext;
+	
 	w = a = s = d = ctrl = shift = alt = lmouse = rmouse = false;
 	glfwSetMouseButtonCallback( window, mouseCallBack );
 	womap[gfx->getWindow()] = this;
@@ -30,6 +39,10 @@ GlfwControl::GlfwControl( RTContext* rtcontext, Glfwgfx* gfx )
 	nx = ox = int(x);
 	ny = oy = gfx->height - int(y);
 	
+#ifdef USE_ROCKET
+	processingRocket = false;
+	this->rContext = rContext;
+#endif
 }
 
 void GlfwControl::mouseCall( int button, int action, int mods )
@@ -41,6 +54,39 @@ void GlfwControl::mouseCall( int button, int action, int mods )
 	// Glfw starts mouse coordinates in top-left corner, we need bottom-left.
 	y = gfx->height-int(floor(dby));
 	
+	
+
+#ifdef USE_ROCKET
+
+	// If we press left inside the menu, we want the action to consider only the menu, not
+	// any feature underneath (visible or not).
+	// This solution is a hack since librocket has neither a function to test for a click
+	// nor any return values indicating whether a click was processed.
+	// The root element covers the entire surface area, thus we have to test for its ID
+	// rather than just test whether the returned element is NULL. Fortunately we set the
+	// ID in the context constructor, so i know precisely what to test for.
+	if( button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS )
+	{
+		processingRocket = rContext->GetHoverElement()->GetId()!="soos";
+	}
+
+	if(processingRocket)
+	{
+		//ensure we get rocket's value for the button
+		int rButton = button == GLFW_MOUSE_BUTTON_RIGHT;
+		if( action == GLFW_PRESS )
+		{
+			rContext->ProcessMouseButtonDown( button, 0 );
+		}
+		else if ( action == GLFW_RELEASE )
+		{
+			rContext->ProcessMouseButtonUp( button, 0 );
+		}
+	}
+	else
+{
+#endif
+
 	if( button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS )
 	{
 		gfx->context->select( x, y, gfx->width, gfx->height );
@@ -49,6 +95,17 @@ void GlfwControl::mouseCall( int button, int action, int mods )
 	{
 		gfx->context->deselect(  );
 	}
+
+#ifdef USE_ROCKET
+}
+	
+	// Release menu
+	if( button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE )
+	{
+			processingRocket = false;
+	}
+#endif
+
 }
 
 void GlfwControl::keyboardAction( void )
@@ -102,6 +159,10 @@ void GlfwControl::mouseMotion( void )
 	nx = x;
 	ny = gfx->height - int(y);
 	
+#ifdef USE_ROCKET
+	rContext->ProcessMouseMove( x, y, 0 );
+#endif
+	
 }
 
 void GlfwControl::actions( void )
@@ -122,3 +183,14 @@ unsigned GlfwControl::timeMillis( void )
 {
 	return glfwGetTime( )*1000.;
 }
+
+
+
+
+
+
+
+
+
+
+

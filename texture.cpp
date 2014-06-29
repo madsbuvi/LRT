@@ -94,3 +94,28 @@ void Texture::writeTextureData( std::vector<float>& buffer )
 	buffer.push_back( float(width)/float(frame_width) );
 	buffer.push_back( float(height)/float(frame_height) );
 }
+
+
+
+Image::Image( const char* filename )
+{
+	int width;
+	int height;
+	image = load_texture( filename, &width, &height );
+	if(!image)
+	{
+		dprintf(0, "Fatal: could not load image \"%s\"\n", filename);
+		return;
+	}
+	this->width = width;
+	this->height = height;
+	this->filename = filename;
+	printf("Muh res: %d, %d\n", width, height);
+	glGenTextures(1, &TID);glErrorCheck;
+	glBindTexture(GL_TEXTURE_2D, TID);glErrorCheck;
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image); glErrorCheck;
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT); glErrorCheck;
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT); glErrorCheck;
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glErrorCheck;
+}
+

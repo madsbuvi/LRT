@@ -8,6 +8,9 @@
 #include <vector>
 #include <stdint.h>
 
+#include "common.h"
+
+
 class Texture
 {
 	static std::vector<Texture*> textures;
@@ -22,6 +25,20 @@ class Texture
 	Texture( const char* filename );
 	void writeTextureData( std::vector<float>& buffer );
 	static cl_mem compileTextureImage( cl_context clcontext, cl_command_queue clqueue );
+};
+
+class Image
+{
+	public:
+	const char* filename;
+	unsigned char* image;
+	int ID;
+	GLuint TID;
+	size_t width;
+	size_t height;
+	Image( const char* filename );
+	unsigned char* getImage( void ){ return image; };
+	GLuint getTexture(){ return TID; };
 };
 
 #endif

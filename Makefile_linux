@@ -1,12 +1,12 @@
 CC = g++
-CFLAGS = -o3 -std=gnu++0x -pedantic -Wall -Wno-unused-function
+CFLAGS = -o3 -std=gnu++0x -pedantic -Wall -Wno-unused-function -DUSE_ROCKET
 DEFS = -DDEBUG=10
 BFLAGS = --debug
-CLFLAGS = -I"/opt/AMDAPP/include" -L"/opt/AMDAPP/lib/x86_64" -L"."
-LFLAGS = -lOpenCL -lSOIL `pkg-config --libs glfw3` -lpthread -ldl -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lXi
+CLFLAGS = -I"/opt/AMDAPP/include" -L"/opt/AMDAPP/lib/x86_64" -I"." -L"." -L"/usr/lib/flgrx"
+LFLAGS = `pkg-config --libs OpenCL` -lSOIL `pkg-config --libs glfw3` -lpthread -ldl -lGLU -lGL -lX11 -lXxf86vm -lXrandr -lXi -lshell -lRocketCore -lRocketDebugger
 
 TARG = LemmingsRT
-OBJS = main.o clstuff.o gfx_glfw.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o host_tracer.o
+OBJS = main.o clstuff.o gfx_glfw.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o host_tracer.o menu.o debug.o rocketmenu.o
 includes = $(wildcard *.h)
 
 
