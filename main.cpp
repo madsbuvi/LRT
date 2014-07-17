@@ -13,11 +13,7 @@
 #include "gfx_glfw.h"
 #include "control_glfw.h"
 #include "shaders.h"
-#include "util.h"
-#include "menu.h"
 
-#include <Rocket/Input.h>
-#include <Rocket/Shell.h>
 
 #define WIDTH 1024
 #define HEIGHT 768
@@ -28,45 +24,13 @@ RTContext* context;
 bool running;
 
 #ifdef USE_ROCKET
-Rocket::Core::Context* rContext;
 
-void rocketLoop()
-{
-	rContext->Update();
-	rContext->Render();
-}
 
 static void exitListen( void* dummy )
 {
 	running = false;
 }
 
-class LrtListener : public Rocket::Core::EventListener
-{
-	LrtClickFunc listen;
-	void* data;
-	bool debuginfo;
-	const char* name;
-public:
-	LrtListener( LrtClickFunc listen, void* data )
-	: listen( listen ), data( data ), debuginfo( false ), name( NULL ) { };
-	
-	LrtListener( LrtClickFunc listen, void* data, const char* name )
-	: listen( listen ), data( data ), name( name ) { debuginfo = name!=NULL; };
-	
-	void ProcessEvent(Rocket::Core::Event& event)
-	{
-		if(debuginfo)
-		{
-			dprintf(1, "Processing event \"%s\" of type \"%s\"\n", name, event.GetType().CString());
-		}
-		else
-		{
-			dprintf(1, "Processing event of type \"%s\"\n", event.GetType().CString());
-		}
-		listen( data );
-	}
-};
 #endif
 
 int main(int argc, char *argv[])
@@ -86,65 +50,8 @@ int main(int argc, char *argv[])
 	context->registerDeviceContext( device );
 	
 #ifdef USE_ROCKET
-	// Generic initialization
-	if (!Shell::Initialise("./"))
-	{
-		Shell::Shutdown();
-		return -1;
-	}
-	
-	// Librocket requires this, i have no idea what this actually does.
-	// I presume i'll need to rerun this if i need to change resolution.
-	glClearColor(0, 0, 0, 1);
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glEnableClientState(GL_COLOR_ARRAY);
-
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glOrtho(0, 1024, 768, 0, -1, 1);
-
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	// Rocket initialisation.
-	ShellRenderInterfaceOpenGL opengl_renderer;
-	Rocket::Core::SetRenderInterface(&opengl_renderer);
-    opengl_renderer.SetViewport(1024, 768);
-
-	ShellSystemInterface system_interface;
-	Rocket::Core::SetSystemInterface(&system_interface);
-
-	Rocket::Core::Initialise();
-
-	// Create the main Rocket context and set it on the shell's input layer.
-	rContext = Rocket::Core::CreateContext("soos", Rocket::Core::Vector2i(1024, 768));
-	if (rContext == NULL)
-	{
-		Rocket::Core::Shutdown();
-		Shell::Shutdown();
-		return -1;
-	}
-
-	Rocket::Debugger::Initialise(rContext);
-	Input::SetContext(rContext);
-
-	Shell::LoadFonts("assets/");
-
-	// Load and show the tutorial document.
-	Rocket::Core::ElementDocument* document = rContext->LoadDocument("assets/Main Menu.rml");
-	document->SetId("dipper");
-	if (document != NULL)
-	{
-		document->GetElementById("title")->SetInnerRML(document->GetTitle());
-		document->Show();
-		document->RemoveReference();
-	}
-	
-	document->GetElementById("main_exit")->AddEventListener("click", new LrtListener( exitListen, NULL, "Exit Listener" ), false);
-	
+	initRocketMenu();
+	registerListener( "exit", exitListen, NULL );
 #endif
 
 	
@@ -437,7 +344,7 @@ int main(int argc, char *argv[])
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	Image* limage = new Image("test.png");
-	MWMenu* testmenu = new MWMenu( make_int2(0,0), make_int2(256,256), limage);
+	//MWMenu* testmenu = new MWMenu( make_int2(0,0), make_int2(256,256), limage);
 	
 	running = true;
 	start = control->timeMillis();
@@ -446,7 +353,7 @@ int main(int argc, char *argv[])
 		void* test = context->trace( WIDTH, HEIGHT );
 		glClear(GL_COLOR_BUFFER_BIT);
 		graphics->blit( test, WIDTH, HEIGHT );
-		testmenu->draw( graphics->getWindow() );
+		//testmenu->draw( graphics->getWindow() );
 		
 #ifdef USE_ROCKET
 		

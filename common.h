@@ -14,12 +14,16 @@
 #include <GLFW/glfw3.h>
 #include "vtypes.h"
 #include "debug.h"
+#include "util.h"
+
+typedef void (*LrtClickFunc)(void* data);
+
+extern bool running;
 
 #ifdef USE_ROCKET
 #include <Rocket/Core.h>
 #include "rocketmenu.h"
 #endif
 
-typedef void (*LrtClickFunc)(void* data);
 
 #endif

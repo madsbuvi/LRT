@@ -1,216 +1,171 @@
 #include "rocketmenu.h"
 #include <Rocket/Core.h>
-
+#include <unordered_map>
+#include <string>
 #define GL_CLAMP_TO_EDGE 0x812F
 
+Rocket::Core::Context* rContext;
 
-void RocketGlInterface::SetViewport(int width, int height)
+std::unordered_map<std::string, LrtClickFunc> listeners;
+std::unordered_map<std::string, void* > listener_data;
+std::unordered_map<std::string, Rocket::Core::ElementDocument* > documents;
+
+static ShellRenderInterfaceOpenGL opengl_renderer;
+static ShellSystemInterface system_interface;
+static Rocket::Core::ElementDocument* active_document;
+
+void rocketLoop()
 {
-    m_width = width;
-    m_height = height;
+	rContext->Update();
+	rContext->Render();
 }
 
-
-// Called by Rocket when it wants to render geometry that it does not wish to optimise.
-void RocketGlInterface::RenderGeometry(Rocket::Core::Vertex* vertices, int ROCKET_UNUSED(num_vertices), int* indices, int num_indices, const Rocket::Core::TextureHandle texture, const Rocket::Core::Vector2f& translation)
+void registerListener( std::string ID, LrtClickFunc listener, void* data )
 {
-	//printf("Call to RenderGeometry made\n");
-	//glfwMakeContextCurrent( window );
-	glPushMatrix();
-	glTranslatef(translation.x, translation.y, 0);
+	listeners[ID] = listener;
+	listener_data[ID] = data;
+}
+void registerListener( char* ID, LrtClickFunc listener, void* data )
+{
+	registerListener( std::string( ID ), listener, data );
+}
 
-	glVertexPointer(2, GL_FLOAT, sizeof(Rocket::Core::Vertex), &vertices[0].position);
-	glEnableClientState(GL_COLOR_ARRAY);
-	glColorPointer(4, GL_UNSIGNED_BYTE, sizeof(Rocket::Core::Vertex), &vertices[0].colour);
-
-	if (!texture)
+class LrtButtonListener : public Rocket::Core::EventListener
+{
+public:
+	
+	void ProcessEvent(Rocket::Core::Event& event)
 	{
-		glDisable(GL_TEXTURE_2D);
-		glDisableClientState(GL_TEXTURE_COORD_ARRAY);
-	}
-	else
-	{
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, (GLuint) texture);
-		glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-		glTexCoordPointer(2, GL_FLOAT, sizeof(Rocket::Core::Vertex), &vertices[0].tex_coord);
-	}
-
-	glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, indices);
-
-	glPopMatrix();
-}
-
-// Called by Rocket when it wants to compile geometry it believes will be static for the forseeable future.		
-Rocket::Core::CompiledGeometryHandle RocketGlInterface::CompileGeometry(Rocket::Core::Vertex* ROCKET_UNUSED(vertices), int ROCKET_UNUSED(num_vertices), int* ROCKET_UNUSED(indices), int ROCKET_UNUSED(num_indices), const Rocket::Core::TextureHandle ROCKET_UNUSED(texture))
-{
-	return (Rocket::Core::CompiledGeometryHandle) NULL;
-}
-
-// Called by Rocket when it wants to render application-compiled geometry.		
-void RocketGlInterface::RenderCompiledGeometry(Rocket::Core::CompiledGeometryHandle ROCKET_UNUSED(geometry), const Rocket::Core::Vector2f& ROCKET_UNUSED(translation))
-{
-}
-
-// Called by Rocket when it wants to release application-compiled geometry.		
-void RocketGlInterface::ReleaseCompiledGeometry(Rocket::Core::CompiledGeometryHandle ROCKET_UNUSED(geometry))
-{
-}
-
-// Called by Rocket when it wants to enable or disable scissoring to clip content.		
-void RocketGlInterface::EnableScissorRegion(bool enable)
-{
-	//glfwMakeContextCurrent( window );
-	if (enable)
-		glEnable(GL_SCISSOR_TEST);
-	else
-		glDisable(GL_SCISSOR_TEST);
-}
-
-// Called by Rocket when it wants to change the scissor region.		
-void RocketGlInterface::SetScissorRegion(int x, int y, int width, int height)
-{
-	//glfwMakeContextCurrent( window );
-	glScissor(x, m_height - (y + height), width, height);
-}
-
-// Set to byte packing, or the compiler will expand our struct, which means it won't read correctly from file
-#pragma pack(1) 
-struct TGAHeader 
-{
-	char  idLength;
-	char  colourMapType;
-	char  dataType;
-	short int colourMapOrigin;
-	short int colourMapLength;
-	char  colourMapDepth;
-	short int xOrigin;
-	short int yOrigin;
-	short int width;
-	short int height;
-	char  bitsPerPixel;
-	char  imageDescriptor;
-};
-// Restore packing
-#pragma pack()
-
-// Called by Rocket when a texture is required by the library.		
-bool RocketGlInterface::LoadTexture(Rocket::Core::TextureHandle& texture_handle, Rocket::Core::Vector2i& texture_dimensions, const Rocket::Core::String& source)
-{
-	Rocket::Core::FileInterface* file_interface = Rocket::Core::GetFileInterface();
-	Rocket::Core::FileHandle file_handle = file_interface->Open(source);
-	if (!file_handle)
-	{
-		return false;
-	}
-	
-	file_interface->Seek(file_handle, 0, SEEK_END);
-	size_t buffer_size = file_interface->Tell(file_handle);
-	file_interface->Seek(file_handle, 0, SEEK_SET);
-	
-	char* buffer = new char[buffer_size];
-	file_interface->Read(buffer, buffer_size, file_handle);
-	file_interface->Close(file_handle);
-
-	TGAHeader header;
-	memcpy(&header, buffer, sizeof(TGAHeader));
-	
-	int color_mode = header.bitsPerPixel / 8;
-	int image_size = header.width * header.height * 4; // We always make 32bit textures 
-	
-	if (header.dataType != 2)
-	{
-		Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Only 24/32bit uncompressed TGAs are supported.");
-		return false;
-	}
-	
-	// Ensure we have at least 3 colors
-	if (color_mode < 3)
-	{
-		Rocket::Core::Log::Message(Rocket::Core::Log::LT_ERROR, "Only 24 and 32bit textures are supported");
-		return false;
-	}
-	
-	const char* image_src = buffer + sizeof(TGAHeader);
-	unsigned char* image_dest = new unsigned char[image_size];
-	
-	// Targa is BGR, swap to RGB and flip Y axis
-	for (long y = 0; y < header.height; y++)
-	{
-		long read_index = y * header.width * color_mode;
-		long write_index = ((header.imageDescriptor & 32) != 0) ? read_index : (header.height - y - 1) * header.width * color_mode;
-		for (long x = 0; x < header.width; x++)
+		const char* aID = event.GetCurrentElement()->GetAttribute<Rocket::Core::String>("action", "do nothing").CString();
+		const char* eID = event.GetCurrentElement()->GetId().CString();
+		dprintf(1, "Processing action \"%s\" in button element \"%s\"\n", aID, eID );
+		std::string ID( aID );
+		LrtClickFunc listen = listeners[ ID ];
+		if( listen == NULL )
 		{
-			image_dest[write_index] = image_src[read_index+2];
-			image_dest[write_index+1] = image_src[read_index+1];
-			image_dest[write_index+2] = image_src[read_index];
-			if (color_mode == 4)
-				image_dest[write_index+3] = image_src[read_index+3];
-			else
-				image_dest[write_index+3] = 255;
-			
-			write_index += 4;
-			read_index += color_mode;
+			dprintf( 0, "Invalid listener\n" );
+		}
+		else
+		{
+			listen( listener_data[ ID ] );
 		}
 	}
+};
 
-	texture_dimensions.x = header.width;
-	texture_dimensions.y = header.height;
+class LrtLinkListener : public Rocket::Core::EventListener
+{
+public:
 	
-	bool success = GenerateTexture(texture_handle, image_dest, texture_dimensions);
+	void ProcessEvent(Rocket::Core::Event& event)
+	{
+		const char* aID = event.GetCurrentElement()->GetAttribute<Rocket::Core::String>("target", "invalid").CString();
+		const char* eID = event.GetCurrentElement()->GetId().CString();
+		dprintf(1, "Processing link to \"%s\" in element \"%s\"\n", aID, eID );
+		std::string ID( aID );
+		Rocket::Core::ElementDocument* target = documents[ ID ];
+		if( target == NULL )
+		{
+			dprintf( 0, "Invalid target\n" );
+		}
+		else
+		{
+			active_document->Hide();
+			active_document = target;
+			active_document->Show();
+		}
+	}
+};
+
+static LrtButtonListener* lrtButtonListener;
+static LrtLinkListener* lrtLinkListener;
+
+static void loadDocument(const char* name, const char* ID)
+{
+	dprintf( 3, "Loading document \"%s\" with ID \"%s\"\n", name, ID );
+	Rocket::Core::ElementDocument* document = rContext->LoadDocument(name);
+	document->SetId(ID);
+	if (document != NULL)
+	{
+		document->GetElementById("title")->SetInnerRML(document->GetTitle());
+		document->Hide();
+		document->RemoveReference();
+	}
 	
-	delete [] image_dest;
-	delete [] buffer;
+	Rocket::Core::ElementList links;
+	Rocket::Core::ElementList buttons;
 	
-	return success;
+	document->GetElementsByTagName(links, "link");
+	document->GetElementsByTagName(buttons, "button");
+	
+	for( auto &link : links )
+	{
+		dprintf( 5, "Listening to a link with ID \"%s\"\n", link->GetId().CString() );
+		link->AddEventListener("click", lrtLinkListener, false);
+	}
+	for( auto &button : buttons )
+	{
+		dprintf( 5, "Listening to a button with ID \"%s\"\n", button->GetId().CString() );
+		button->AddEventListener("click", lrtButtonListener, false);
+	}
+	
+	documents[ std::string( ID ) ] = document;
+	
+	//document->GetElementById("main_exit")->AddEventListener("click", lrtButtonListener, false);
 }
 
-// Called by Rocket when a texture is required to be built from an internally-generated sequence of pixels.
-bool RocketGlInterface::GenerateTexture(Rocket::Core::TextureHandle& texture_handle, const Rocket::Core::byte* source, const Rocket::Core::Vector2i& source_dimensions)
+void initRocketMenu( void )
 {
-	GLuint texture_id = 0;
-	
-	
-	//glfwMakeContextCurrent( window );
-	
-	glGenTextures(1, &texture_id);
-	if (texture_id == 0)
+// Generic initialization
+	if (!Shell::Initialise("./"))
 	{
-		printf("Failed to generate textures\n");
-		return false;
+		Shell::Shutdown();
+	}
+	
+	// Librocket requires this, i have no idea what this actually does.
+	// I presume i'll need to rerun this if i need to change resolution.
+	glClearColor(0, 0, 0, 1);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glEnableClientState(GL_COLOR_ARRAY);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glOrtho(0, 1024, 768, 0, -1, 1);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+
+	// Rocket initialisation.
+	Rocket::Core::SetRenderInterface(&opengl_renderer);
+    opengl_renderer.SetViewport(1024, 768);
+
+	Rocket::Core::SetSystemInterface(&system_interface);
+
+	Rocket::Core::Initialise();
+
+	// Create the main Rocket context and set it on the shell's input layer.
+	rContext = Rocket::Core::CreateContext("soos", Rocket::Core::Vector2i(1024, 768));
+	if (rContext == NULL)
+	{
+		Rocket::Core::Shutdown();
+		Shell::Shutdown();
 	}
 
-	glBindTexture(GL_TEXTURE_2D, texture_id);
+	Rocket::Debugger::Initialise(rContext);
+	Input::SetContext(rContext);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, source_dimensions.x, source_dimensions.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, source);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	texture_handle = (Rocket::Core::TextureHandle) texture_id;
-
-	return true;
-}
-
-// Called by Rocket when a loaded texture is no longer required.		
-void RocketGlInterface::ReleaseTexture(Rocket::Core::TextureHandle texture_handle)
-{
-	//glfwMakeContextCurrent( window );
+	Shell::LoadFonts("assets/");
 	
-	glDeleteTextures(1, (GLuint*) &texture_handle);
+	// Create the common listener
+	lrtButtonListener = new LrtButtonListener();
+	lrtLinkListener = new LrtLinkListener();
+
+	// Load and show the tutorial document.
+	
+	loadDocument( "assets/Main Menu.rml", "main" );
+	loadDocument( "assets/Map Editor.rml", "maped" );
+	active_document = documents[ std::string( "main" ) ];
+	active_document->Show();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
