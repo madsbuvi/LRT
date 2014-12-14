@@ -99,7 +99,7 @@ DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 	
 	/* Build Kernel Program */
 	cl_int ret = clBuildProgram( rtprogram, 1, &cldevice, "-I ./", NULL, NULL );
-	if( ret ){
+	if( 1 ){
 		fprintf( stderr, "Error code %d:\n", ret );
 		size_t ssiz = 0;
         HandleErrorRet( clGetProgramBuildInfo( rtprogram, cldevice, CL_PROGRAM_BUILD_LOG, 0, NULL, &ssiz ) );

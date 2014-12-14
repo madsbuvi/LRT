@@ -53,18 +53,28 @@ static inline float2 make_float2(const float a1, const float a2)
 
 
 typedef struct {
-	float3 normal;
-	float t;
-	float2 tex;
-} Result;
-
-typedef struct {
 	float3 origin;
 	float3 direction;
 	int type;
 	float min;
 	float max;
+	
+#ifdef DEVICE_SIDE
+	float relevance;
+#endif
 } Ray;
+
+typedef struct {
+	float3 normal;
+	float t;
+	float2 tex;
+	unsigned shader;
+	float3 result;
+	bool trace;
+	bool recur;
+	bool ready;
+	Ray reflect;
+} Result;
 
 typedef struct {
 	float3 center;
@@ -93,13 +103,27 @@ __constant Result MISS =
 {
 	{ 0.f, 0.f, 0.f },
 	-1.f,
-	{0.f, 0.f}
+	{0.f, 0.f},
+	0,
+	{ 0.f, 0.f, 0.f },
+	0,
+	0,
+	1
 };
 
 
-static Ray make_ray( float3 o, float3 dir, int type, float min, float max )
+static Ray make_ray( float3 o, float3 dir, int type, float min, float max
+#ifdef DEVICE_SIDE
+	, float relevance
+#endif
+)
 {
-	Ray ray = {o, dir, type, min, max};
+	Ray ray = {o, dir, type, min, max
+	
+#ifdef DEVICE_SIDE
+	, relevance
+#endif
+	};
 	return ray;
 }
 #endif

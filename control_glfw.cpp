@@ -1,10 +1,12 @@
 #include <vector>
 #include <unordered_map>
+#include "control_glfw.h"
+
+#ifdef USE_ROCKET
 #include <Rocket/Core/Input.h>
 #include <Rocket/Core/Types.h>
 #include <Rocket/Core/SystemInterface.h>
-#include "control_glfw.h"
-
+#endif
 
 // Workaround for not being allowed to pass user data to glfw callbacks
 // Window-Object map

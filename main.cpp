@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAB( make_float3( float(i)*4.f, -1.f, float(j)*4.f ), make_float3( float(i+1)*4.f, 0.f, float(j+1)*4.f ) ),
 							new SimpleDiffusionShaderTex( L3Dredbase ) );
 	}
+	
 	forrange2( i, 2, 9, j, 2, 9 )
 	{
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), 0.f, float(j) ) ),
@@ -90,6 +91,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), 1.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dblue ) );
 	}
+	
 	forrange2( i, 3, 5, j, 3, 8 )
 	{
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), 2.f, float(j) ) ),
@@ -100,6 +102,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), 2.f, float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+	
 	forrange3( i, 2, 9, j, 2, 9, k, 4, 9 )
 	{
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(k), float(j) ) ),
@@ -110,7 +113,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(3), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
-	
+	/*
 	forrange( i, 3, 8 )
 	{
 		context->addGeometry( new Geometry_AAB( make_float3( float(3), float(3), float(i) ) ),
@@ -343,30 +346,37 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAP( make_float3( float(10), float(i), float(7) ), NE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+	*/
 	Image* limage = new Image("test.png");
 	//MWMenu* testmenu = new MWMenu( make_int2(0,0), make_int2(256,256), limage);
 	
 	running = true;
 	start = control->timeMillis();
 	while( running ){
+		// Treat all control inputs made since last update
 		control->actions( );
+		
+		// Perform a new ray trace and update graphics buffer
 		void* test = context->trace( WIDTH, HEIGHT );
 		glClear(GL_COLOR_BUFFER_BIT);
 		graphics->blit( test, WIDTH, HEIGHT );
 		//testmenu->draw( graphics->getWindow() );
 		
 #ifdef USE_ROCKET
-		
+		// Update the user interface
 		rocketLoop();
 
 #endif
-
+		// Blit the buffer
 		graphics->update( );
 		
 
 		frames++;
 		free(test);
+		// Perform any actions that need performing between frames but before going to sleep.
 		unsigned time = control->postactions( );
+		
+		// Sleep to make sure framerate doesn't explode
 		if( time < 10 )
 		{
 			std::this_thread::sleep_for(std::chrono::milliseconds(10 - time));
@@ -378,10 +388,11 @@ int main(int argc, char *argv[])
 	}
 	
 	// Shutdown Rocket.
+#ifdef USE_ROCKET
 	rContext->RemoveReference();
 	Rocket::Core::Shutdown();
-
 	Shell::CloseWindow();
 	Shell::Shutdown();
+#endif
 	return 0;
 }
