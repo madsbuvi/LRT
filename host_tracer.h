@@ -5,6 +5,7 @@
 #include "shared.h"
 #include "geometry.h"
 
-int selectTrace( Ray ray, std::vector<Geometry*>& geometry );
+int selectTrace( Ray ray, int* ints, float* floats, int n );
+int selectTrace2( Ray ray, std::vector<Geometry*>& geometry );
 
 #endif

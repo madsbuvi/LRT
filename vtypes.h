@@ -71,6 +71,10 @@ inline float2 fminf(const float2& a, const float2& b)
 {
 	return make_float2(fminf(a.x,b.x), fminf(a.y,b.y));
 }
+inline float2 fminf(const float2& a, const float2& b, const float2& c)
+{
+	return fminf( fminf( a, b ), c );
+}
 inline float fminf(const float2& a)
 {
  return fminf(a.x, a.y);
@@ -80,6 +84,10 @@ inline float fminf(const float2& a)
 inline float2 fmaxf(const float2& a, const float2& b)
 {
 	return make_float2(fmaxf(a.x,b.x), fmaxf(a.y,b.y));
+}
+inline float2 fmaxf(const float2& a, const float2& b, const float2& c)
+{
+	return fmaxf( fmaxf( a, b ), c );
 }
 inline float fmaxf(const float2& a)
 {
@@ -264,6 +272,10 @@ inline float4 fminf(const float4& a, const float4& b)
 {
 	return make_float4(fminf(a.x,b.x), fminf(a.y,b.y), fminf(a.z,b.z), fminf(a.w,b.w));
 }
+inline float4 fminf(const float4& a, const float4& b, const float4& c)
+{
+	return fminf( fminf( a, b ), c );
+}
 inline float fminf(const float4& a)
 {
  return fminf(fminf(a.x, a.y), fminf(a.z, a.w));
@@ -273,6 +285,10 @@ inline float fminf(const float4& a)
 inline float4 fmaxf(const float4& a, const float4& b)
 {
 	return make_float4(fmaxf(a.x,b.x), fmaxf(a.y,b.y), fmaxf(a.z,b.z), fmaxf(a.w,b.w));
+}
+inline float4 fmaxf(const float4& a, const float4& b, const float4& c)
+{
+	return fmaxf( fmaxf( a, b ), c );
 }
 inline float fmaxf(const float4& a)
 {

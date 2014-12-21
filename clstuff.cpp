@@ -99,7 +99,7 @@ DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 	
 	/* Build Kernel Program */
 	cl_int ret = clBuildProgram( rtprogram, 1, &cldevice, "-I ./", NULL, NULL );
-	if( 1 ){
+	if( ret ){
 		fprintf( stderr, "Error code %d:\n", ret );
 		size_t ssiz = 0;
         HandleErrorRet( clGetProgramBuildInfo( rtprogram, cldevice, CL_PROGRAM_BUILD_LOG, 0, NULL, &ssiz ) );
@@ -119,6 +119,7 @@ DeviceContext::DeviceContext( unsigned device, GLFWwindow* window )
 	boxes_allocated = false;
 	geometry_allocated = false;
 	AAB_allocated = false;
+	bvh_allocated = false;
 }
 
 
@@ -161,6 +162,8 @@ void* DeviceContext::trace( unsigned width, unsigned height, float3 U, float3 V,
 	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(int), &n_geo) );
 	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(light), &light) );
 	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &shader_data_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &bvhints_dev) );
+	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &bvhfloats_dev) );
 	HandleErrorRet( clSetKernelArg( rtkernel, arg++, sizeof(cl_mem), &pack) );
 	size_t global[] = {width, height};
 	size_t local[] = {16, 16};
@@ -488,6 +491,55 @@ void DeviceContext::updateGeometry( std::vector<Geometrydata>& gd, std::vector<i
 	}
 }
 
+void DeviceContext::updateBVH( BVH::KP::pointer bvh )
+{
+	if( bvh_allocated )
+	{
+		HandleErrorRet(
+			clReleaseMemObject( bvhfloats_dev )
+		);
+		HandleErrorRet(
+			clReleaseMemObject( bvhints_dev )
+		);
+	}
+	
+	n_bvh = bvh->size();
+	
+	if( n_bvh )
+	{
+		bvhfloats_dev = cl_malloc( clcontext, n_bvh * 6 * sizeof( float ) );
+		bvhints_dev = cl_malloc( clcontext, n_bvh * 6 * sizeof( float ) );
+		bvh_allocated = true;
+		float* floats;
+		int* ints;
+		HandleErrorPar(
+			floats = (float*)clEnqueueMapBuffer( clqueue, bvhfloats_dev, true, CL_MAP_WRITE, 0, n_bvh * 6 * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		HandleErrorPar(
+			ints = (int*)clEnqueueMapBuffer( clqueue, bvhints_dev, true, CL_MAP_WRITE, 0, n_bvh * 6 * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		
+		bvh->write( ints, floats );
+		
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, bvhfloats_dev, (void*)floats, 0, NULL, NULL )
+		);
+		HandleErrorRet(
+			clEnqueueUnmapMemObject( clqueue, bvhints_dev, (void*)ints, 0, NULL, NULL )
+		);
+		
+	}
+	else
+	{
+		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
+		bvhfloats_dev = cl_malloc( clcontext, 128 );
+		bvh_allocated = true;
+		// Allocate a dummy object, as the AMD implementation will segfault if i try to launch with an unallocated buffer
+		bvhints_dev = cl_malloc( clcontext, 128 );
+		bvh_allocated = true;
+	}
+}
+
 void RTContext::updateDevices( void )
 {
 	std::vector<Sphere> spheres;
@@ -498,6 +550,7 @@ void RTContext::updateDevices( void )
 	std::vector<Geometrydata> gd;
 	std::vector<int> primitives;
 	std::vector<float> shader_data;
+	std::vector<BVH::Primdata> primdata;
 	
 	for( Geometry* geo: geometry )
 	{
@@ -538,17 +591,27 @@ void RTContext::updateDevices( void )
 					primitives.push_back( boxes.size() - 1 );
 					break;
 			}
+			
+			BVH::Primdata newprim;
+			newprim.type = primitives[ primitives.size()-2 ];
+			newprim.index = primitives[ primitives.size()-1 ];
+			newprim.shader = gd.size();
+			newprim.shaderIndex = data.shaderindex;
+			newprim.bound = p->bound();
+			primdata.push_back(newprim);
 		}
 		
 		gd.push_back( data );
 	}
 	
+	BVH::KP::pointer bvh = BVH::KP::build( primdata );
 	
 	devices[0].updateSpheres( spheres );
 	devices[0].updateTriangles( triangles );
 	devices[0].updateBoxes( boxes );
 	devices[0].updateGeometry( gd, primitives, shader_data );
 	devices[0].updateAABs( AABs );
+	devices[0].updateBVH( bvh );
 }
 
 void* RTContext::trace( unsigned width, unsigned height )
@@ -560,6 +623,7 @@ void* RTContext::trace( unsigned width, unsigned height )
 	
 	float3 U, V, W;
 	
+	//printf("camera: <%.4g, %.4g, %.4g><%.4g, %.4g>\n", eye.x, eye.y, eye.z, angles.x, angles.y);
 	
 	calculateCameraVariables( eye, a2, a3, 45,
 				float(width) / float(height),
@@ -585,6 +649,9 @@ void RTContext::select( int x, int y, unsigned width, unsigned height )
 		return;
 	}
 	
+	dprintf( 2, "coordinates: %d, %d\n", x, y );
+	return;
+	
 	a2 = eye + spheric(angles);
 	a3 = spheric( make_float2( angles.x, angles.y - M_PI/2.f ) );
 	
@@ -601,7 +668,18 @@ void RTContext::select( int x, int y, unsigned width, unsigned height )
 	float3 ray_origin = eye;
 	float3 ray_direction = normalize(d.x*U + d.y*V + W);
 	Ray ray = make_ray(ray_origin, ray_direction, 0, RT_DEFAULT_MIN, RT_DEFAULT_MAX);
-	selectedObject = selectTrace(ray, geometry);
+	
+	
+		float* floats;
+		int* ints;
+		HandleErrorPar(
+			floats = (float*)clEnqueueMapBuffer( devices[0].clqueue, devices[0].bvhfloats_dev, true, CL_MAP_WRITE, 0, devices[0].n_bvh * 6 * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+		HandleErrorPar(
+			ints = (int*)clEnqueueMapBuffer(devices[0]. clqueue, devices[0].bvhints_dev, true, CL_MAP_WRITE, 0, devices[0].n_bvh * 6 * sizeof( float ), 0, NULL, NULL, HANDLE_ERROR )
+		);
+	
+	selectedObject = selectTrace( ray, ints, floats, devices[0].n_bvh );
 	if(selectedObject >= 0){
 		assert( selectedObject < int(geometry.size()) );
 		geometry[ selectedObject ] -> select( );
@@ -664,8 +742,8 @@ void RTContext::lmouse( int x, int y, bool ctrl, bool shift, bool alt )
 
 RTContext::RTContext( void )
 {
-	eye = make_float3( 2, 1, 0 );
-	angles = make_float2( 1.52f, 1.81f );
+	eye = make_float3( -2.048, 4.516, 2.153 );
+	angles = make_float2( 1.19f, 1.67f );
 	selectedObject = -1;
 	dirty = true;
 }

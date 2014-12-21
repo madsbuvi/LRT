@@ -17,10 +17,15 @@
 #define printiall(a) printf( #a ": %d\n", a );
 #define printuall(a) printf( #a ": %u\n", a );
 
+//#define ifprint(...) if( get_global_id(0) == 160 && get_global_id(1) == 120 ){ printf(__VA_ARGS__);}
+#define ifprint(...) 
+
 
 __constant const sampler_t smplr = CLK_NORMALIZED_COORDS_TRUE | CLK_ADDRESS_MIRRORED_REPEAT | CLK_FILTER_LINEAR;
 
 enum PrimitiveType { Sphere_t, Triangle_t, Rectangle_t, Quadrilateral_t, AAB_t, Box_t };
+
+
 
 static inline unsigned gid( void )
 {
@@ -29,6 +34,41 @@ static inline unsigned gid( void )
 
 
 #include "shared.h"
+
+typedef struct {
+	/* All our basic primitives, which will serve to build all other shapes */
+	/* Sphere parameters */
+	__global float3* sphere_centers;
+	__global float* sphere_radi;
+	int nspheres;
+	/* Triangle parameters */
+	__global float3* triangles;
+	int ntriangles;
+	/* Axis-Aligned Box parameters */
+	__global float3* AABs;
+	int nAABs;
+	/* Box parameters */
+	__global float3* boxes;
+	__global float* box_heights;
+	int nboxes;
+	
+	/* Geometry */
+	__global int* geometry;
+	__global int* primitives;
+	int nobjects;
+	
+	/* Shader data */
+	float3 light_pos;
+	__global float* shader_data;
+	
+	/* BVH data */
+	
+	__global int* bvh_ints;
+	__global float* bvh_floats;
+	
+	/* Active ray */
+	Ray ray;
+} rt_context;
 
 
 inline float fminf(const float3 a)
@@ -121,19 +161,7 @@ static float gmod( float a1, float a2 )
 }
 
 static Result intersect(
-	/* All our basic primitives, which will serve to build all other shapes */
-	/* Sphere parameters */
-	__global float3* sphere_centers, __global float* sphere_radi, int nspheres,
-	/* Triangle parameters */
-	__global float3* triangles, int ntriangles,
-	/* Axis-Aligned Box parameters */
-	__global float3* AABs, int nAABs,
-	/* Box parameters */
-	__global float3* boxes, __global float* box_heights, int nboxes,
-	
-	/* Geometry */
-	__global int* geometry, __global int* primitives, int nobjects,
-	
+	rt_context context,
 	Ray ray
 	)
 {
@@ -143,10 +171,10 @@ static Result intersect(
 	Result nyligst;
 	//printi( nobjects );
 	
-	for( int i = 0; i < nobjects; i++ )
+	for( int i = 0; i < context.nobjects; i++ )
 	{
-		__global int* p = &primitives[ geometry[ i*4 ] ];
-		int nprim = geometry[ i*4 + 1];
+		__global int* p = &context.primitives[ context.geometry[ i*4 ] ];
+		int nprim = context.geometry[ i*4 + 1];
 		for( int j = 0; j < nprim; j++ )
 		{
 			int type = p[ j*2 ];
@@ -157,24 +185,24 @@ static Result intersect(
 			{
 				case Sphere_t:
 				{
-					Sphere sphere = { sphere_centers[index], sphere_radi[index] };
+					Sphere sphere = { context.sphere_centers[index], context.sphere_radi[index] };
 					nyligst = intersect_sphere( ray, sphere );
 					break;
 				}	
 				case Triangle_t:
-					nyligst = intersect_triangle( ray, triangles[index*3], triangles[index*3+1], triangles[index*3+2] );
+					nyligst = intersect_triangle( ray, context.triangles[index*3], context.triangles[index*3+1], context.triangles[index*3+2] );
 					break;
 					
 				case AAB_t:
-					nyligst = intersect_AAB( ray, AABs[ index*2 ], AABs[ index*2 + 1 ] );
+					nyligst = intersect_AAB( ray, context.AABs[ index*2 ], context.AABs[ index*2 + 1 ] );
 					break;
 				case Box_t:
 				{
 					Box box = {
-						boxes[ index*3 + 0 ],
-						boxes[ index*3 + 1 ],
-						boxes[ index*3 + 2 ],
-						box_heights[ index ]
+						context.boxes[ index*3 + 0 ],
+						context.boxes[ index*3 + 1 ],
+						context.boxes[ index*3 + 2 ],
+						context.box_heights[ index ]
 					};
 
 					nyligst = intersect_box( ray, box );
@@ -187,9 +215,115 @@ static Result intersect(
 			{
 				closest = nyligst;
 				closest.shader = i;
+				ifprint("REGULAR New closest at <%d, %d, %d>\n", type, index, i);
 			}
 			
 		}
+	}
+	return closest;
+}
+
+static Result bvhintersect(
+	rt_context context,
+	Ray ray
+	)
+{
+	// RAY TRACING
+	Result closest = MISS;
+	closest.t = RT_DEFAULT_MAX+1.f;
+	Result nyligst;
+	//printi( nobjects );
+	
+	int id = 0;
+	
+	while( id >= 0 )
+	{
+		ifprint("\nEntering new id[%d]\n", id);
+		int type = context.bvh_ints[ id*6 + 0 ];
+		int index = context.bvh_ints[ id*6 + 1 ];
+		int shader = context.bvh_ints[ id*6 + 2 ];
+		int shaderIndex = context.bvh_ints[ id*6 + 3 ];
+		int next = context.bvh_ints[ id*6 + 4 ];
+		int failureLink = context.bvh_ints[ id*6 + 5 ];
+		
+		
+		ifprint("type: %d\n", type);
+		ifprint("index: %d\n", index);
+		ifprint("shader: %d\n", shader);
+		ifprint("shaderIndex: %d\n", shaderIndex);
+		ifprint("next: %d\n", next);
+		ifprint("failureLink: %d\n", failureLink);
+		
+		float t = bound(
+			ray,
+			make_float3( context.bvh_floats[ id*6 + 0 ], context.bvh_floats[ id*6 + 1 ], context.bvh_floats[ id*6 + 2 ] ),
+			make_float3( context.bvh_floats[ id*6 + 3 ], context.bvh_floats[ id*6 + 4 ], context.bvh_floats[ id*6 + 5 ] )
+			);
+			
+		float3 bmin = make_float3( context.bvh_floats[ id*6 + 0 ], context.bvh_floats[ id*6 + 1 ], context.bvh_floats[ id*6 + 2 ] );
+		float3 bmax = make_float3( context.bvh_floats[ id*6 + 3 ], context.bvh_floats[ id*6 + 4 ], context.bvh_floats[ id*6 + 5 ] );
+		ifprint("bmin: <%.4g, %.4g, %.4g>\n", bmin.x, bmin.y, bmin.z);
+		ifprint("bmax: <%.4g, %.4g, %.4g>\n", bmax.x, bmax.y, bmax.z);
+		ifprint("t: %g\n", t);
+		if( t > RT_DEFAULT_MIN && t < closest.t )
+		{
+			// Node is relevant
+			
+			if( type >= 0 )
+			{
+				// Leaf node
+				// Test the primitive
+				switch( type )
+				{
+					case Sphere_t:
+					{
+						Sphere sphere = { context.sphere_centers[index], context.sphere_radi[index] };
+						nyligst = intersect_sphere( ray, sphere );
+						break;
+					}	
+					case Triangle_t:
+						nyligst = intersect_triangle( ray, context.triangles[index*3], context.triangles[index*3+1], context.triangles[index*3+2] );
+						break;
+						
+					case AAB_t:
+						nyligst = intersect_AAB( ray, context.AABs[ index*2 ], context.AABs[ index*2 + 1 ] );
+						break;
+					case Box_t:
+					{
+						Box box = {
+							context.boxes[ index*3 + 0 ],
+							context.boxes[ index*3 + 1 ],
+							context.boxes[ index*3 + 2 ],
+							context.box_heights[ index ]
+						};
+
+						nyligst = intersect_box( ray, box );
+						
+						break;
+					}
+				}
+
+				if( nyligst.t > RT_DEFAULT_MIN && nyligst.t < closest.t )
+				{
+					closest = nyligst;
+					closest.shader = shader;
+					ifprint("New closest at <%d, %d, %d>\n", type, index, shader);
+				}
+				
+				id = next;
+			}
+			else
+			{
+				// Internal node, continue exploring the tree
+				id = next;
+			}
+		}
+		else
+		{
+			//Follow failure link
+			id = failureLink;
+		}
+		
 	}
 	return closest;
 }
@@ -234,11 +368,12 @@ static Result diffusion_shader_tex( Ray ray, float3 light_pos, Result data, __gl
 	return data;
 }
 
-static Result diffusion_shader_tex_reflect1( Ray ray, float3 light_pos, Result data, __global float* shader_data,
+static Result phong_shader1( rt_context context, Result data,
 							__read_only image2d_array_t textr )
 {
+	Ray ray = context.ray;
 	float3 hit_point = ray.origin + ray.direction * data.t;
-	float3 light_dir = normalize( light_pos - hit_point );
+	float3 light_dir = normalize( context.light_pos - hit_point );
 	// Diffuse lighting based on rotation relative to light source
 	float diffuseFactor = max( dot( normalize( data.normal ),
 											light_dir )
@@ -247,15 +382,21 @@ static Result diffusion_shader_tex_reflect1( Ray ray, float3 light_pos, Result d
 	//int2 coord = { hit_point.x, hit_point };
 	//printf( "<%g, %g, %g>\n",  hit_point.z, fmod(hit_point.z, shader_data[2]), gmod(hit_point.z, shader_data[2]) );
 	uint4 texui = read_imageui( textr, smplr, make_float4(
-							gmod(data.tex.x, shader_data[1]),
-							gmod(data.tex.y, shader_data[2]),
-							shader_data[0], 0 ) );
+							gmod(data.tex.x, context.shader_data[1]),
+							gmod(data.tex.y, context.shader_data[2]),
+							context.shader_data[0], 0 ) );
 	float3 tex = make_float3( texui.x, texui.y, texui.z ) / 255.f;
+	
+	// Shadows
+	Ray shadow_ray = make_ray( hit_point, light_dir, REGULAR, RT_DEFAULT_MIN, RT_DEFAULT_MAX, 1.f );
+	Result shadow = MISS;
+	if(shadow.t > RT_DEFAULT_MIN && shadow.t < RT_DEFAULT_MAX )
+	{
+		totallight = 0.f;
+	}
 	
 	//float3 result = ambient_effect * ambient_color + make_float3( shader_data[0], shader_data[1], shader_data[2] ) * totallight;
 	data.result = ( ambient_effect * ambient_color + totallight ) * tex;
-	
-	// Add shadows here
 	
 	// Add reflection here
 	
@@ -284,9 +425,10 @@ static Result diffusion_shader_tex_reflect1( Ray ray, float3 light_pos, Result d
 	return data;
 }
 
-static Result diffusion_shader_tex_reflect2( Ray ray, float3 light_pos, Result data, Result reflect, __global float* shader_data,
+static Result phong_shader2( rt_context context, Result data, Result reflect, 
 							__read_only image2d_array_t textr )
 {
+	//TODO: Make use of reflectance
 	data.result = data.result + data.reflect.relevance*reflect.result;
 	return data;
 }
@@ -315,6 +457,11 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	float3 light_pos,
 	__global float* shader_data,
 	
+	/* BVH data */
+	
+	__global int* bvh_ints,
+	__global float* bvh_floats,
+	
 	/* Texture(s) */
 	__read_only image2d_array_t pack
 	)
@@ -322,11 +469,27 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	// CAMERA
 	float2 d1 = {get_global_id(0), get_global_id(1)};
 	float2 d2 = {get_global_size(0), get_global_size(1)};
+	
+
+	ifprint("STARTING NEW TRACE: %d, %d\n", get_global_id(0), get_global_id(1));
+	
 	float2 d = d1 / d2 * 2.f - 1.f;
 	float3 ray_origin = eye;
 	float3 ray_direction = normalize(d.x*U - d.y*V + W);
 	
 	int lid = get_local_id(0) * get_local_size(0) + get_local_id(1);
+	
+	rt_context context = 
+	{
+		sphere_centers, sphere_radi, nspheres,
+		triangles, ntriangles,
+		AABs, nAABs,
+		boxes, box_heights, nboxes,
+		geometry, primitives, nobjects,
+		light_pos, shader_data,
+		bvh_ints, bvh_floats
+	};
+	
 	/*
 	if( fabs(ray_direction.x) < RT_MIN_ANGLE ) ray_direction.x = RT_MIN_ANGLE;
 	if( fabs(ray_direction.y) < RT_MIN_ANGLE ) ray_direction.y = RT_MIN_ANGLE;
@@ -346,36 +509,34 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 	
 	while( indice )
 	{
-
+		context.ray = ray_stack[indice - 1];
 		Result active = result_stack[indice - 1];
+		ifprint("\n\n\nindice[%u]:\n", indice);
+		
 		if(active.trace)
 		{
-			active = intersect(
-				sphere_centers, sphere_radi, nspheres,
-				triangles, ntriangles,
-				AABs, nAABs,
-				boxes, box_heights, nboxes,
-				geometry, primitives, nobjects,
-				ray_stack[indice - 1]
-				);
-				
-
+			active = bvhintersect( context, context.ray );
+			ifprint("intersection result:\nnormal: <%.4g, %.4g, %.4g>\n", active.normal.x, active.normal.y, active.normal.z);
+			ifprint("intersection result:\nt: <%.4g>\n", active.t);
+			ifprint("intersection result:\ntex: <%.4g, %.4g>\n", active.tex.x, active.tex.y);
+			ifprint("intersection result:\nshader: <%u>\n", active.shader);
 			int shader = geometry[ active.shader*4 + 2 ];
 			int shader_data_index = geometry[ active.shader*4 + 3 ];
+			context.shader_data = &shader_data[ shader_data_index ];
 				
 			if(active.t > RT_DEFAULT_MIN && active.t < RT_DEFAULT_MAX )
 			{
 				active.normal = faceback( active.normal, ray.direction );
 				switch( shader )
 				{
-					case SIMPLE_DIFFUSION_SHADER:
-						active = diffusion_shader( ray, light_pos, active, &shader_data[ shader_data_index ]);
-						break;
-					case SIMPLE_DIFFUSION_SHADER_TEX:
-						active = diffusion_shader_tex( ray, light_pos, active, &shader_data[ shader_data_index ], pack );
-						break;
+					//case SIMPLE_DIFFUSION_SHADER:
+					//	active = diffusion_shader( ray, light_pos, active, &shader_data[ shader_data_index ]);
+					//	break;
+					//case SIMPLE_DIFFUSION_SHADER_TEX:
+					//	active = diffusion_shader_tex( ray, light_pos, active, &shader_data[ shader_data_index ], pack );
+					//	break;
 					case SIMPLE_DIFFUSION_SHADER_TEX_REFLECT:
-						active = diffusion_shader_tex_reflect1( ray, light_pos, active, &shader_data[ shader_data_index ], pack );
+						active = phong_shader1( context, active, pack );
 						break;
 				}
 			}
@@ -389,7 +550,7 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 			switch( shader )
 			{
 				case SIMPLE_DIFFUSION_SHADER_TEX_REFLECT:
-					active = diffusion_shader_tex_reflect2( ray, light_pos, active, result_stack[indice], &shader_data[ shader_data_index ], pack );
+					active = phong_shader2( context, active, result_stack[indice], pack );
 					break;
 			}
 		}

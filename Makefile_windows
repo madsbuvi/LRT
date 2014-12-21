@@ -6,8 +6,8 @@ CLFLAGS = -I"D:\usr\dev\include" -I"C:\Program Files (x86)\AMD APP SDK\2.9\inclu
 LFLAGS = -lpthread -lOpenCL -lmingw32 -lSOIL -lglfw3 -lglu32 -lopengl32 -lgdi32
 
 TARG = LemmingsRT.exe
-OBJS = main.o clstuff.o gfx_glfw.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o host_tracer.o menu.o debug.o
-includes = $(wildcard *.h)
+OBJS = main.o clstuff.o gfx_glfw.o control_glfw.o geometry.o shaders.o oglstuff.o clutil.o texture.o host_tracer.o menu.o debug.o bvh.o
+includes = $(wildcard *.h) intersectors.inc
 
 
 all	: $(TARG)

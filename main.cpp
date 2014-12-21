@@ -15,16 +15,16 @@
 #include "shaders.h"
 
 
-#define WIDTH 1024
-#define HEIGHT 768
+#define WIDTH 1920
+#define HEIGHT 1020
 
 Glfwgfx* graphics;
 Control* control;
 RTContext* context;
 bool running;
 
-#ifdef USE_ROCKET
 
+#ifdef USE_ROCKET
 
 static void exitListen( void* dummy )
 {
@@ -60,7 +60,6 @@ int main(int argc, char *argv[])
 	, rContext 
 #endif
 	);
-	
 	
 	//Texture* stardust = new Texture("Textures/stardust.png");
 	Texture* cgo = new Texture("Textures/congruent_outline.png");
@@ -113,7 +112,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAB( make_float3( float(i), float(3), float(j) ) ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
-	/*
+	
 	forrange( i, 3, 8 )
 	{
 		context->addGeometry( new Geometry_AAB( make_float3( float(3), float(3), float(i) ) ),
@@ -193,16 +192,19 @@ int main(int argc, char *argv[])
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
 	
+
 	forrange( i, 6, 9 )
 	{
 		context->addGeometry( new Geometry_AAP( make_float3( float(1), float(i), float(2) ), SW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+
 	forrange( i, 7, 9 )
 	{
 		context->addGeometry( new Geometry_AAP( make_float3( float(0), float(i), float(3) ), SW ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
+
 	forrange( i, 6, 9 )
 	{
 		context->addGeometry( new Geometry_AAP( make_float3( float(1), float(i), float(8) ), SE ),
@@ -294,6 +296,10 @@ int main(int argc, char *argv[])
 							new SimpleDiffusionShaderTex( L3Dbrown ) );
 	}
 	
+	
+	
+	
+	
 	forrange( i, 3, 8 )
 	{
 		context->addGeometry( new Geometry_AAP( make_float3( float(9), float(2), float(i) ), DN ),
@@ -346,7 +352,7 @@ int main(int argc, char *argv[])
 		context->addGeometry( new Geometry_AAP( make_float3( float(10), float(i), float(7) ), NE ),
 							new SimpleDiffusionShaderTex( L3Dgreen ) );
 	}
-	*/
+	
 	Image* limage = new Image("test.png");
 	//MWMenu* testmenu = new MWMenu( make_int2(0,0), make_int2(256,256), limage);
 	

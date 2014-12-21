@@ -24,6 +24,33 @@ static float2 f3zy( float3 arg )
 	return make_float2( arg.z, arg.y );
 }
 
+static float bound( Ray ray, float3 bmin, float3 bmax )
+{
+	
+	// Simple Axis Aligned Box intersection
+	float3 t_0    = (bmin - ray.origin)/ray.direction;
+	float3 t_1    = (bmax - ray.origin)/ray.direction;
+	float t_near = fmaxf( fminf3( t_0, t_1 ) );
+	float t_far  = fminf( fmaxf3( t_0, t_1 ) );
+	if(t_near >= t_far)
+	{
+		// Does not intersect
+		return -1.f;
+	}
+
+	// Make sure we pick an intersection that's not behind the origin
+	if(t_near < 0.)
+	{
+		if(t_far < 0.)
+		{
+			return -1.f;
+		}
+		return t_far;
+	}
+	
+	return t_near;
+}
+
 static Result intersect_AAB( Ray ray, float3 bmin, float3 bmax )
 {
 	

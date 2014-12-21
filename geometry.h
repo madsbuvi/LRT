@@ -10,6 +10,8 @@ enum PrimitiveType { SPHERE, TRIANGLE, QUADRILATERAL, AAB, BOX};
 enum GeometryType { GEO_GENERIC=0, GEO_AAB=1, GEO_AAP=2  };
 enum Orientation { UN, UW, US, UE, DN, DW, DS, DE, NW, SW, SE, NE };
 
+class AAB_t;
+
 class Primitive
 {
 	protected:
@@ -17,35 +19,48 @@ class Primitive
 	public:
 	PrimitiveType getType( void ) { return type; };
 	virtual ~Primitive( void ) = default;
+	virtual AAB_t bound() = 0;
 };
 
-
-class Sphere_t: public Primitive
-{
-	public:
-	Sphere s; 
-	Sphere_t( float3 c, float r ){ s.radius = r; s.center = c; type = SPHERE; };
-};
-
-class Triangle_t: public Primitive
-{
-	public:
-	Triangle s; 
-	Triangle_t( float3 v1, float3 v2, float3 v3 ){ s.v1 = v1; s.v2 = v2; s.v3 = v3; type = TRIANGLE; };
-};
-
-class Quadrilateral_t: public Primitive
-{
-	public:
-	Quadrilateral s;
-	Quadrilateral_t( float3 v1, float3 v2, float3 v3, float3 v4 ){ s.v1 = v1; s.v2 = v2; s.v3 = v3; s.v4 = v4; type = QUADRILATERAL; };
-};
 
 class AAB_t: public Primitive
 {
 	public:
 	AAB_s s;
-	AAB_t( float3 bmin, float3 bmax ){ s.bmin = bmin; s.bmax = bmax; type = AAB; };
+	AAB_t( ){ s.bmin = make_float3(0.f); s.bmax = make_float3(0.f); type = AAB; };
+	AAB_t( float3 bmin, float3 bmax ){
+		float3 diff = bmax-bmin;
+		if( diff.x < 0.01f )
+		{
+			bmin.x -= 0.005f;
+			bmax.x += 0.005f;
+		}
+		if( diff.y < 0.01f )
+		{
+			bmin.y -= 0.005f;
+			bmax.y += 0.005f;
+		}
+		if( diff.z < 0.01f )
+		{
+			bmin.z -= 0.005f;
+			bmax.z += 0.005f;
+		}
+		s.bmin = bmin;
+		s.bmax = bmax;
+		type = AAB;
+	};
+	
+	float3 min(){ return s.bmin; }
+	float3 max(){ return s.bmax; }
+	AAB_t merge( AAB_t other )
+	{
+		return AAB_t( fminf( min(), other.min() ), fmaxf( max(), other.max() ) );
+	}
+	
+	virtual AAB_t bound()
+	{
+		return *this;
+	}
 };
 
 class Box_t: public Primitive
@@ -53,6 +68,55 @@ class Box_t: public Primitive
 	public:
 	Box s;
 	Box_t( float3 s1, float3 s2, float3 s3, float h ){ s.s1 = s1; s.s2 = s2; s.s3 = s3; s.h = h; type = BOX; };
+	virtual AAB_t bound()
+	{
+		return AAB_t(
+			fminf( s.s1, s.s2, s.s3 ),
+			fmaxf( s.s1, s.s2, s.s3 )
+		);
+	}
+};
+
+class Sphere_t: public Primitive
+{
+	public:
+	Sphere s; 
+	Sphere_t( float3 c, float r ){ s.radius = r; s.center = c; type = SPHERE; };
+	virtual AAB_t bound()
+	{
+		return AAB_t(
+			s.center - s.radius,
+			s.center + s.radius
+		);
+	}
+};
+
+class Triangle_t: public Primitive
+{
+	public:
+	Triangle s; 
+	Triangle_t( float3 v1, float3 v2, float3 v3 ){ s.v1 = v1; s.v2 = v2; s.v3 = v3; type = TRIANGLE; };
+	virtual AAB_t bound()
+	{
+		return AAB_t(
+			fminf( s.v1, fminf(s.v2, s.v3) ),
+			fmaxf( s.v1, fmaxf(s.v2, s.v3) )
+		);
+	}
+};
+
+class Quadrilateral_t: public Primitive
+{
+	public:
+	Quadrilateral s;
+	Quadrilateral_t( float3 v1, float3 v2, float3 v3, float3 v4 ){ s.v1 = v1; s.v2 = v2; s.v3 = v3; s.v4 = v4; type = QUADRILATERAL; };
+	virtual AAB_t bound()
+	{
+		return AAB_t(
+			fminf( fminf( s.v1, s.v2 ), fminf( s.v3, s.v4 ) ),
+			fmaxf( fmaxf( s.v1, s.v2 ), fmaxf( s.v3, s.v4 ) )
+		);
+	}
 };
 
 

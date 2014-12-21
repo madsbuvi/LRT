@@ -12,6 +12,7 @@
 #include <GLFW/glfw3.h>
 #include "common.h"
 #include "geometry.h"
+#include "bvh.h"
 
 
 struct Geometrydata
@@ -24,6 +25,7 @@ struct Geometrydata
 
 class DeviceContext
 {
+	public:
 	cl_device_id cldevice;
 	cl_context clcontext;
 	cl_command_queue clqueue;
@@ -59,7 +61,12 @@ class DeviceContext
 	cl_mem shader_data_dev;
 	int n_geo;
 	
-	public:
+	// Geometry data
+	bool bvh_allocated;
+	cl_mem bvhfloats_dev;
+	cl_mem bvhints_dev;
+	int n_bvh;
+	
 	DeviceContext( unsigned device, GLFWwindow* window );
 	void* trace( unsigned width, unsigned height, float3 U, float3 V, float3 W, float3 eye );
 	void updateSpheres( std::vector<Sphere>& spheres );
@@ -67,6 +74,7 @@ class DeviceContext
 	void updateAABs( std::vector<AAB_s>& AABs);
 	void updateBoxes( std::vector<Box>& boxes );
 	void updateGeometry( std::vector<Geometrydata>& gd, std::vector<int>& primitives, std::vector<float>& shader_data );
+	void updateBVH( BVH::KP::pointer bvh );
 };
 
 class RTContext

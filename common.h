@@ -12,6 +12,10 @@
 #include <GL/gl.h>
 #include <GL/glu.h>
 #include <GLFW/glfw3.h>
+
+#include <memory>
+using std::shared_ptr;
+
 #include "vtypes.h"
 #include "debug.h"
 #include "util.h"
