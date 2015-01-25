@@ -16,30 +16,69 @@ using std::ostream;
 
 class Shader
 {
+	friend class ShaderContext;
 	
-	static std::vector<Shader*> shaders;
+	//! Index into shaderdata vector
+	int m_DataIndex;
 	
 	public:
-	static Shader* 	getDefaultShader( void );
-	static void 	writeShaders( ostream& out );
-	static void 	clear( void );
-	
-	virtual void writeOff( ostream& out ) = 0;
-	virtual void writeShaderData( std::vector<float>& buffer ) = 0;
+	//! Return the unique ID of this shader (equivalent to its index in the shader context's shader vector)
 	int getID( void ) { return ID; };
+	
+	// Numeric identifier of shader type
 	int shader;
 	
+	// Generic destructor
 	virtual ~Shader( void ){};
 	
 	
 	protected:
+	//! Shader ID
 	int ID;
-	Shader(void){ 
-		ID = shaders.size();
-		shaders.push_back(this);
-	};
+	
+	//! Write shader to text
+	virtual void writeOff( ostream& out ) = 0;
+	
+	//! Write shader to float vector
+	virtual void writeShaderData( std::vector<float>& buffer ) = 0;
 	
 	
+};
+
+class ShaderContext
+{
+	//! Vector of the shaders related to this context
+	std::vector<Shader*> m_Shaders;
+	
+	//! The default shader
+	Shader* m_DefaultShader;
+	
+	
+	public:
+	//! Returns the default shader of this context
+	Shader* getDefaultShader( void ){ return m_DefaultShader; };
+	
+	//! Sets the default shader of this context
+	void 	setDefaultShader( Shader* defaultShader){ m_DefaultShader = defaultShader; };
+	
+	//! Write all shader data to float vector
+	void 	writeShaderData( std::vector<float>& buffer );
+	
+	//! Write all shaders to text
+	void 	writeShaders( ostream& out );
+	
+	//! Wipe all shader data (Not recommended, just delete this and make a new context)
+	void 	clear( void );
+	
+	//! Add a shader to the context
+	void	addShader( Shader* shader );
+	
+	//! Generic constructor
+			ShaderContext( void ){};
+	
+	//! Destructor. Will delete all shaders related to this context.
+			~ShaderContext( void );
+
 };
 
 class SimpleDiffusionShader: public Shader

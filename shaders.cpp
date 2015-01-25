@@ -1,32 +1,21 @@
 #include "shaders.h"
 
-std::vector<Shader*> Shader::shaders;
-Shader* Shader::getDefaultShader( void )
-{ 
-		if( shaders.size() == 0 )
-		{
-			throw std::runtime_error( "Attempted to run raytracer without defining any shaders.\n" );
-		}
-		return shaders[0];
-}
-
-
-void Shader::writeShaders( ostream& out )
+void ShaderContext::writeShaders( ostream& out )
 {
-	for( Shader* boop: shaders )
+	for( Shader* boop: m_Shaders )
 	{
 		boop->writeOff( out );
 		out << std::endl;
 	}
 }
 
-void Shader::clear( void )
+void ShaderContext::clear( void )
 {
-	for( Shader* boop: shaders)
+	for( Shader* boop: m_Shaders)
 	{
 		delete boop;
 	}
-	shaders.clear();
+	m_Shaders.clear();
 }
 
 void SimpleDiffusionShader::writeOff( ostream& out )
@@ -53,4 +42,29 @@ void SimpleDiffusionShaderTex::writeShaderData( std::vector<float>& buffer )
 
 SimpleDiffusionShaderTex::~SimpleDiffusionShaderTex( void )
 {
+}
+
+void ShaderContext::writeShaderData( std::vector<float>& buffer )
+{
+	int dataIndex = 0;
+	for( Shader* boop: m_Shaders )
+	{
+		boop->writeShaderData( buffer );
+		boop->m_DataIndex = dataIndex;
+		dataIndex++;
+	}
+}
+
+ShaderContext::~ShaderContext( void )
+{
+	for( Shader* boop: m_Shaders )
+	{
+		delete boop;
+	}
+}
+
+void	ShaderContext::addShader( Shader* shader )
+{
+	shader->ID = m_Shaders.size();
+	m_Shaders.push_back( shader );
 }
