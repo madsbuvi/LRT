@@ -3,13 +3,15 @@
 #include <math.h>
 #include <CL/cl.h>
 #include <CL/cl_platform.h>
+
+#include <iostream>
 /* float2 functions */
 /******************************************************************************/
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-
+using std::ostream;
 // Use opencl types to guarantee being spatially identical.
 typedef cl_float2 float2;
 typedef cl_float3 float3;
@@ -229,6 +231,12 @@ inline float2 faceforward(const float2& n, const float2& i, const float2& nref)
 inline float2 expf(const float2& v)
 {
  return make_float2(::expf(v.x), ::expf(v.y));
+}
+// Stream out
+inline ostream& operator<<( ostream& out, const float2& f )
+{
+	out << "FLOAT2{" << f.x << "," << f.y << "}";
+	return out;
 }
 
 
@@ -507,6 +515,14 @@ inline float3 faceforward3(const float3& n, const float3& i, const float3& nref)
 {
  return n * copysignf( 1.0f, dot(i, nref) );
 }
+
+// Stream out
+inline ostream& operator<<( ostream& out, const float3& f )
+{
+	out << "FLOAT3{" << f.x << "," << f.y << "," << f.z << "}";
+	return out;
+}
+
 
 
 /* int2 functions */

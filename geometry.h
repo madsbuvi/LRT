@@ -3,6 +3,8 @@
 
 #include <vector>
 #include <stdio.h>
+#include <iostream>
+using std::ostream;
 #include "vtypes.h"
 #include "shaders.h"
 #include "shared.h"
@@ -122,14 +124,16 @@ class Quadrilateral_t: public Primitive
 
 class Geometry
 {
-	Shader* shader;
+
 	protected:
+	Shader* shader;
 	bool dirty;
 	std::vector<Primitive*> primitives;
 	
 	virtual void buildPrimitives( void ){};
 	
 	public:
+	typedef std::vector< Geometry > GeometryList;
 	
 	Geometry( void ){ shader = NULL; dirty = true; };
 	~Geometry( void ){ primitives.clear( ); }
@@ -141,10 +145,11 @@ class Geometry
 	
 	virtual void move( float3 d ) = 0;
 	void move( float dx, float dy, float dz ){ move( make_float3( dx, dy, dz ) ); };
-	virtual void writeOff( FILE* fp ) = 0;
+	virtual void writeOff( ostream& out ) = 0;
 	virtual void select( void ){};
 	virtual void deselect( void ){};
 };
+ostream& operator<<( ostream& out, Geometry& geo );
 
 class Geometry_Generic: public Geometry
 {
@@ -155,23 +160,23 @@ class Geometry_Generic: public Geometry
 	Geometry_Generic( void ){ };
 	Geometry_Generic( Primitive* p ){ primitives.push_back( p ); };
 	virtual void move( float3 d ){};
-	void writeOff( FILE* fp );
+	void writeOff( ostream& out );
 };
 class Geometry_AAB: public Geometry
 {
 	float3 bmin;
-	float3 bmax_offset;
+	float3 bmax;
 	
 	protected:
 	virtual void buildPrimitives( void );
 	
 	public:
 	Geometry_AAB( void ){ };
-	Geometry_AAB( float3 bmin ){ this->bmin = bmin; bmax_offset = make_float3( 1.f ); };
-	Geometry_AAB( float3 bmin, float3 bmax ){ this->bmin = bmin; this->bmax_offset = bmax - bmin; };
+	Geometry_AAB( float3 bmin ){ this->bmin = bmin; bmax = bmin + make_float3( 1.f ); };
+	Geometry_AAB( float3 bmin, float3 bmax ){ this->bmin = bmin; this->bmax = bmax; };
 	virtual void move( float3 d );
 	virtual void deselect( void );
-	void writeOff( FILE* fp );
+	void writeOff( ostream& out );
 };
 class Geometry_AAP: public Geometry
 {
@@ -186,7 +191,7 @@ class Geometry_AAP: public Geometry
 	public:
 	Geometry_AAP( void ){ };
 	Geometry_AAP( float3 bmin, Orientation o );
-	void writeOff( FILE* fp );
+	void writeOff( ostream& out );
 	virtual void move( float3 d );
 	virtual void deselect( void );
 };
@@ -200,11 +205,9 @@ class Pyramid: public Geometry
 	
 	public:
 	Pyramid( float3 v1, float3 v2, float3 v3, float3 v4, float3 apex );
-	void writeOff( FILE* fp );
+	void writeOff( ostream& out );
 	virtual void move( float3 d ){};
 };
-
-
 Geometry* make_sphere( float3 c, float r );
 Geometry* make_triangle( float3 v1, float3 v2, float3 v3 );
 Geometry* make_quadrilateral( float3 v1, float3 v2, float3 v3, float3 v4 );

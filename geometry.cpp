@@ -9,17 +9,26 @@ Shader* Geometry::getShader( void ) {
 	}
 }
 
+ostream& operator<<( ostream& out, Geometry& geo )
+{
+	geo.writeOff(out);
+	return out;
+}
 
-void Geometry_Generic::writeOff( FILE* fp )
+void Geometry_Generic::writeOff( ostream& out )
 {
+	// Generic geometry shall store either a list of primitives
+	// Or a reference to an object descriptor and a list of metadata
 }
-void Geometry_AAB::writeOff( FILE* fp )
+void Geometry_AAB::writeOff( ostream& out )
 {
+	out << "AXISALIGNEDBOX{" << shader->getID() << "}{ " << bmin << " " << bmax << " }";
 }
-void Geometry_AAP::writeOff( FILE* fp )
+void Geometry_AAP::writeOff( ostream& out )
 {
+	out << "AXISALIGNEDPRISM{" << shader->getID() << "}{ " << bmin << " ENUM{ " << o << " } }";
 }
-void Pyramid::writeOff( FILE* fp )
+void Pyramid::writeOff( ostream& out )
 {
 }
 
@@ -68,6 +77,11 @@ Geometry* make_box( float3 s1, float3 s2, float3 s3, float h )
 {
 	Box_t* p = new Box_t( s1, s2, s3, h );
 	return new Geometry_Generic( p );
+}
+
+Geometry* make_aab( float3 bmin, float3 bmax )
+{
+	return new Geometry_AAB( bmin, bmax );
 }
 
 void Geometry_AAP::make_AAPrismFlip( float3 v1, float3 v2, float3 v5 )
@@ -135,7 +149,7 @@ std::vector<Primitive*>* Geometry::getPrimitives( void )
 void Geometry_AAB::buildPrimitives( void )
 {
 	primitives.clear();
-	addPrimitive( new AAB_t( bmin, bmin + bmax_offset ) );
+	addPrimitive( new AAB_t( bmin, bmax ) );
 }
 
 void Geometry_AAB::move( float3 d )

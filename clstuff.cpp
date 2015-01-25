@@ -753,3 +753,24 @@ unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
 	devices.push_back( dcontext );
 	return devices.size();
 }
+
+
+ostream& RTContext::operator<<( ostream& out )
+{
+	out << "SHADERLIST{" << std::endl;
+	Shader::writeShaders( out );
+	out << "}" << std::endl;
+
+	out << "GEOMETRYLIST{" << std::endl;
+	for( Geometry* geo: geometry )
+	{
+		out << *geo << std::endl;
+	}
+	out << "}" << std::endl;
+	return out;
+}
+
+ostream& operator<<( ostream& out, RTContext& context )
+{
+	return context << out;
+}

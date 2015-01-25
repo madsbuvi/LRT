@@ -6,6 +6,9 @@
 #include <vector>
 #include <stdexcept>
 #include "texture.h"
+#include <stdio.h>
+#include <iostream>
+using std::ostream;
 
 #define SIMPLE_DIFFUSION_SHADER 0
 #define SIMPLE_DIFFUSION_SHADER_TEX 1
@@ -17,34 +20,55 @@ class Shader
 	static std::vector<Shader*> shaders;
 	
 	public:
-	static Shader* getDefaultShader( void );
+	static Shader* 	getDefaultShader( void );
+	static void 	writeShaders( ostream& out );
+	static void 	clear( void );
+	
+	virtual void writeOff( ostream& out ) = 0;
 	virtual void writeShaderData( std::vector<float>& buffer ) = 0;
+	int getID( void ) { return ID; };
 	int shader;
-	// Note that the base Shader constructor implies that the first created shader will be the default shader until this function is called.
-	// Note also that there is no destructor support yet, so all shaders should be passed by reference / pointers for now, lest the list point to dead shaders. Do not declare on stack / 10.
-	void setAsDefaultShader( void ){ shaders.insert( shaders.begin(), this ); };
+	
+	virtual ~Shader( void ){};
+	
 	
 	protected:
-	Shader(void){ shaders.push_back(this); };
+	int ID;
+	Shader(void){ 
+		ID = shaders.size();
+		shaders.push_back(this);
+	};
 	
 	
 };
 
 class SimpleDiffusionShader: public Shader
 {
-	float3 color;
+	float3 m_color;
 	public:
-	SimpleDiffusionShader( float3 color ){ shader = SIMPLE_DIFFUSION_SHADER; this->color = color; };
+	SimpleDiffusionShader( float3 color ){
+		shader = SIMPLE_DIFFUSION_SHADER;
+		m_color = color;
+	};
+	virtual ~SimpleDiffusionShader( void ){};
 	void writeShaderData( std::vector<float>& buffer );
+	void writeOff( ostream& out );
 };
 
 
 class SimpleDiffusionShaderTex: public Shader
 {
-	Texture* tex;
+	Texture* 	m_tex;
+	const char* m_filename;
 	public:
-	SimpleDiffusionShaderTex( Texture* texture ){ shader = SIMPLE_DIFFUSION_SHADER_TEX; tex = texture; };
+	SimpleDiffusionShaderTex( const char* filename ){
+		shader = SIMPLE_DIFFUSION_SHADER_TEX;
+		m_tex = new Texture( filename );
+		m_filename = filename;
+	};
+	virtual ~SimpleDiffusionShaderTex( void );
 	void writeShaderData( std::vector<float>& buffer );
+	void writeOff( ostream& out );
 };
 
 

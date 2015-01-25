@@ -35,20 +35,16 @@ static float bound( Ray ray, float3 bmin, float3 bmax )
 	if(t_near >= t_far)
 	{
 		// Does not intersect
-		return -1.f;
+		return RT_DEFAULT_MAX + 2.f;
 	}
 
 	// Make sure we pick an intersection that's not behind the origin
-	if(t_near < 0.)
+	if( t_near < 0.f && t_far < 0.f )
 	{
-		if(t_far < 0.)
-		{
-			return -1.f;
-		}
-		return t_far;
+		return RT_DEFAULT_MAX + 2.f;
 	}
-	
 	return t_near;
+	
 }
 
 static Result intersect_AAB( Ray ray, float3 bmin, float3 bmax )

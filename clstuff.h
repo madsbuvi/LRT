@@ -14,6 +14,9 @@
 #include "geometry.h"
 #include "bvh.h"
 
+#include <iostream>
+using std::ostream;
+
 
 struct Geometrydata
 {
@@ -100,8 +103,10 @@ class RTContext
 	void strafe( float mod );
 	void rmouse( int x, int y, bool ctrl, bool shift, bool alt );
 	void lmouse( int x, int y, bool ctrl, bool shift, bool alt );
+	ostream& operator<<( ostream& out );
 	
 };
+ostream& operator<<( ostream& out, RTContext& context );
 
 int clinit( void );
 
