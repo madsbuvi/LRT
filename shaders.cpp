@@ -46,12 +46,10 @@ SimpleDiffusionShaderTex::~SimpleDiffusionShaderTex( void )
 
 void ShaderContext::writeShaderData( std::vector<float>& buffer )
 {
-	int dataIndex = 0;
 	for( Shader* boop: m_Shaders )
 	{
+		boop->m_DataIndex = buffer.size();
 		boop->writeShaderData( buffer );
-		boop->m_DataIndex = dataIndex;
-		dataIndex++;
 	}
 }
 
@@ -67,4 +65,19 @@ void	ShaderContext::addShader( Shader* shader )
 {
 	shader->ID = m_Shaders.size();
 	m_Shaders.push_back( shader );
+}
+
+
+Shader*	ShaderContext::makeSimpleDiffusionShaderTex( const char* filename )
+{
+	Shader* shader = new SimpleDiffusionShaderTex( filename );
+	addShader( shader );
+	return shader;
+}
+
+Shader*	ShaderContext::makeSimpleDiffusionShader( float3 color )
+{
+	Shader* shader = new SimpleDiffusionShader( color );
+	addShader( shader );
+	return shader;
 }

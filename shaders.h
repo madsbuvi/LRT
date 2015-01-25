@@ -25,14 +25,20 @@ class Shader
 	//! Return the unique ID of this shader (equivalent to its index in the shader context's shader vector)
 	int getID( void ) { return ID; };
 	
-	// Numeric identifier of shader type
-	int shader;
+	//! Returns a numeric identifier of the shader type
+	int getShaderType( void ){ return shader; };
+	
+	//! Returns a numeric identifier of the shader type
+	int getShaderDataIndex( void ){ return m_DataIndex; };
 	
 	// Generic destructor
 	virtual ~Shader( void ){};
 	
 	
 	protected:
+	// Numeric identifier of shader type
+	int shader;
+	
 	//! Shader ID
 	int ID;
 	
@@ -78,13 +84,19 @@ class ShaderContext
 	
 	//! Destructor. Will delete all shaders related to this context.
 			~ShaderContext( void );
+			
+	//! Shader constructor wrappers. Limiting construction of shaders to these is to ensure shaders belong to this context
+	Shader*	makeSimpleDiffusionShader( float3 color );
+	Shader*	makeSimpleDiffusionShaderTex( const char* filename );
 
 };
 
 class SimpleDiffusionShader: public Shader
 {
+	friend class ShaderContext;
+	
 	float3 m_color;
-	public:
+	
 	SimpleDiffusionShader( float3 color ){
 		shader = SIMPLE_DIFFUSION_SHADER;
 		m_color = color;
@@ -97,9 +109,11 @@ class SimpleDiffusionShader: public Shader
 
 class SimpleDiffusionShaderTex: public Shader
 {
+	friend class ShaderContext;
+	
 	Texture* 	m_tex;
 	const char* m_filename;
-	public:
+	
 	SimpleDiffusionShaderTex( const char* filename ){
 		shader = SIMPLE_DIFFUSION_SHADER_TEX;
 		m_tex = new Texture( filename );

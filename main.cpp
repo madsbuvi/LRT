@@ -354,7 +354,7 @@ int main(int argc, char *argv[])
 	*/
 	parser::load( "A head above the rest.l3m", *context );
 
-	Image* limage = new Image("test.png");
+	//Image* limage = new Image("test.png");
 	//MWMenu* testmenu = new MWMenu( make_int2(0,0), make_int2(256,256), limage);
 	
 	running = true;

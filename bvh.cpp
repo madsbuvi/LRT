@@ -112,8 +112,8 @@ void KPNode::write( int* ints, float* floats )
 	if( ! m_Leaf )
 	{
 		ints[ m_Id*6 + 0 ] = -1;
-		ints[ m_Id*6 + 4 ] = m_Second->id();
-		ints[ m_Id*6 + 5 ] = m_FailureLink;
+		ints[ m_Id*6 + 3 ] = m_Second->id();
+		ints[ m_Id*6 + 4 ] = m_FailureLink;
 		m_First->write( ints, floats );
 		m_Second->write( ints, floats );
 	}
@@ -121,10 +121,9 @@ void KPNode::write( int* ints, float* floats )
 	{
 		ints[ m_Id*6 + 0 ] = m_Data.type;
 		ints[ m_Id*6 + 1 ] = m_Data.index;
-		ints[ m_Id*6 + 2 ] = m_Data.shader;
-		ints[ m_Id*6 + 3 ] = m_Data.shaderIndex;
+		ints[ m_Id*6 + 2 ] = m_Data.geometryIndex;
+		ints[ m_Id*6 + 3 ] = m_FailureLink;
 		ints[ m_Id*6 + 4 ] = m_FailureLink;
-		ints[ m_Id*6 + 5 ] = m_FailureLink;
 	}
 }
 

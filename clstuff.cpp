@@ -552,14 +552,15 @@ void RTContext::updateDevices( void )
 	std::vector<float> shader_data;
 	std::vector<BVH::Primdata> primdata;
 	
+	m_ShaderContext.writeShaderData( shader_data );
+	
 	for( Geometry* geo: geometry )
 	{
 		Geometrydata data;
 		data.primindex = primitives.size();
 		data.nprim = geo->getPrimitives()->size();
-		data.shader = geo->getShader()->shader;
-		data.shaderindex = shader_data.size();
-		geo->getShader()->writeShaderData(shader_data);
+		data.shader = geo->getShader()->getShaderType();
+		data.shaderindex = geo->getShader()->getShaderDataIndex();
 		
 		for( Primitive* p: *geo->getPrimitives() )
 		{
@@ -595,14 +596,14 @@ void RTContext::updateDevices( void )
 			BVH::Primdata newprim;
 			newprim.type = primitives[ primitives.size()-2 ];
 			newprim.index = primitives[ primitives.size()-1 ];
-			newprim.shader = gd.size();
-			newprim.shaderIndex = data.shaderindex;
+			newprim.geometryIndex = gd.size();
 			newprim.bound = p->bound();
 			primdata.push_back(newprim);
 		}
 		
 		gd.push_back( data );
 	}
+	
 	
 	BVH::KP::pointer bvh = BVH::KP::build( primdata );
 	
@@ -758,7 +759,7 @@ unsigned RTContext::registerDeviceContext( DeviceContext dcontext )
 ostream& RTContext::operator<<( ostream& out )
 {
 	out << "SHADERLIST{" << std::endl;
-	Shader::writeShaders( out );
+	m_ShaderContext.writeShaders( out );
 	out << "}" << std::endl;
 
 	out << "GEOMETRYLIST{" << std::endl;

@@ -68,7 +68,7 @@ typedef struct {
 	float3 normal;
 	float t;
 	float2 tex;
-	unsigned shader;
+	unsigned geo;
 	float3 result;
 	bool trace;
 	bool recur;

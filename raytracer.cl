@@ -138,9 +138,10 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 			ifprint("intersection result:\nnormal: <%.4g, %.4g, %.4g>\n", active.normal.x, active.normal.y, active.normal.z);
 			ifprint("intersection result:\nt: <%.4g>\n", active.t);
 			ifprint("intersection result:\ntex: <%.4g, %.4g>\n", active.tex.x, active.tex.y);
-			ifprint("intersection result:\nshader: <%u>\n", active.shader);
-			int shader = geometry[ active.shader*4 + 2 ];
-			int shader_data_index = geometry[ active.shader*4 + 3 ];
+			ifprint("intersection result:\nshader: <%u>\n", active.geo);
+			
+			int shader = geometry[ active.geo*4 + 2 ];
+			int shader_data_index = geometry[ active.geo*4 + 3 ];
 			context.shader_data = &shader_data[ shader_data_index ];
 				
 			if(active.t > RT_DEFAULT_MIN && active.t < RT_DEFAULT_MAX )
@@ -163,8 +164,8 @@ __kernel void raytrace( float3 U, float3 V, float3 W, float3 eye, __global uint*
 		else if (active.recur)
 		{
 			active.recur = 0;
-			int shader = geometry[ active.shader*4 + 2 ];
-			int shader_data_index = geometry[ active.shader*4 + 3 ];
+			int shader = geometry[ active.geo*4 + 2 ];
+			int shader_data_index = geometry[ active.geo*4 + 3 ];
 
 			switch( shader )
 			{

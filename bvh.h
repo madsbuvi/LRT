@@ -11,8 +11,7 @@ struct Primdata
 {
 	int type;
 	int index;
-	int shader;
-	int shaderIndex;
+	int geometryIndex;
 	AAB_t bound;
 };
 

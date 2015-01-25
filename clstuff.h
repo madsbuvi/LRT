@@ -91,6 +91,8 @@ class RTContext
 	int selectedObject;
 	bool dirty;
 	
+	ShaderContext m_ShaderContext;
+	
 	public:
 	RTContext( void );
 	void select( int x, int y, unsigned width, unsigned height );
@@ -104,6 +106,8 @@ class RTContext
 	void rmouse( int x, int y, bool ctrl, bool shift, bool alt );
 	void lmouse( int x, int y, bool ctrl, bool shift, bool alt );
 	ostream& operator<<( ostream& out );
+	
+	ShaderContext* shaderContext( void ){ return &m_ShaderContext; };
 	
 };
 ostream& operator<<( ostream& out, RTContext& context );

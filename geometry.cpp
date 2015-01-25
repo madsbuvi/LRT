@@ -1,12 +1,7 @@
 #include "geometry.h"
 
 Shader* Geometry::getShader( void ) {
-	if ( shader == NULL ){
-		return Shader::getDefaultShader();
-	}
-	else{
-		return shader;
-	}
+	return shader;
 }
 
 ostream& operator<<( ostream& out, Geometry& geo )

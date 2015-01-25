@@ -27,19 +27,25 @@ namespace phoenix = boost::phoenix;
 namespace qi = boost::spirit::qi;
 namespace ascii = boost::spirit::ascii;
 
+
+static std::vector<Geometry*> 	geometry;
+static std::vector<Shader*> 	shaders;
+static ShaderContext* 			shaderContext = NULL;
+
+
 static void make_float3 ( float3& val, float a1, float a2, float a3 )
 {
 	val = ::make_float3( a1, a2, a3 );
 }
 
-static void make_aab ( std::vector<Geometry*>& geometry, std::vector<Shader*>& shaders, int shader, float3 a1, float3 a2 )
+static void make_aab ( int shader, float3 a1, float3 a2 )
 {
 	Geometry* geo = new Geometry_AAB( a1, a2 );
 	geo->setShader( shaders[shader] );
 	geometry.push_back( geo );
 }
 
-static void make_aap ( std::vector<Geometry*>& geometry, std::vector<Shader*>& shaders, int shader, float3 a1, int orientation )
+static void make_aap ( int shader, float3 a1, int orientation )
 {
 	Geometry* geo = new Geometry_AAP( a1, Orientation(orientation) );
 	geo->setShader( shaders[shader] );
@@ -47,11 +53,11 @@ static void make_aap ( std::vector<Geometry*>& geometry, std::vector<Shader*>& s
 	
 }
 
-static void make_simpleDiffusionTex ( std::vector<Geometry*>& geometry, std::vector<Shader*>& shaders, int ID, std::string filename )
+static void make_simpleDiffusionTex ( int ID, std::string filename )
 {
 	assert( ID >= 0 );
 	assert( unsigned(ID) == shaders.size() );
-	shaders.push_back( new SimpleDiffusionShaderTex( filename.c_str() ) );
+	shaders.push_back( shaderContext->makeSimpleDiffusionShaderTex( filename.c_str() ) );
 	std::cout << ID << ": " << filename << std::endl;
 }
 
@@ -70,20 +76,14 @@ struct LevelGrammar : qi::grammar< Iterator, qi::unused_type, ascii::space_type 
 		
 		r_aab = ( boost::spirit::lit("AXISALIGNEDBOX") >> "{" >> qi::int_ >> "}" >> "{" >> r_float3 >> r_float3 >> "}")
 			[ boost::phoenix::bind( &make_aab,
-									boost::phoenix::ref(geometry), 
-									boost::phoenix::ref(shaders), 
 									qi::_1, qi::_2, qi::_3 ) ];
 		r_aap = ( boost::spirit::lit("AXISALIGNEDPRISM") >> "{" >> qi::int_ >> "}" >> "{" >> r_float3 >> r_enum >> "}")
 			[ boost::phoenix::bind( &make_aap,
-									boost::phoenix::ref(geometry), 
-									boost::phoenix::ref(shaders), 
 									qi::_1, qi::_2, qi::_3 ) ];
 		r_geometry = r_aab | r_aap;
 		
 		r_simpleDiffusionTex = ( boost::spirit::lit("SIMPLEDIFFUSIONSHADERTEX") >> "{" >> qi::int_ >> "}" >> "{" >> r_string >> "}")
 			[ boost::phoenix::bind( &make_simpleDiffusionTex,
-									boost::phoenix::ref(geometry), 
-									boost::phoenix::ref(shaders), 
 									qi::_1, qi::_2 ) ];
 		r_shader = r_simpleDiffusionTex;
 		
@@ -106,10 +106,6 @@ struct LevelGrammar : qi::grammar< Iterator, qi::unused_type, ascii::space_type 
 	qi::rule< Iterator, qi::unused_type, ascii::space_type >	r_geometrylist;
 	qi::rule< Iterator, qi::unused_type, ascii::space_type >	r_shaderlist;
 	qi::rule< Iterator, qi::unused_type, ascii::space_type >	r_top;
-	
-	public:
-	std::vector<Geometry*> geometry;
-	std::vector<Shader*> shaders;
 };
 
 //SIMPLEDIFFUSIONSHADERTEX{4}{ "Textures/Brown-L3D.png" }
@@ -119,7 +115,13 @@ struct LevelGrammar : qi::grammar< Iterator, qi::unused_type, ascii::space_type 
 void load( const char* filename, RTContext& context )
 {
     using boost::spirit::ascii::space;
-
+	
+	shaderContext = context.shaderContext();
+	if( shaderContext == NULL )
+	{
+		std::cerr << "Attempted to load level into an invalid context (shaderContext=NULL)" << std::endl;
+	}
+	
 	std::ifstream in( filename );
 	if( !in.good() )
 	{
@@ -143,8 +145,8 @@ void load( const char* filename, RTContext& context )
     {
         std::cout << "-------------------------\n";
         std::cout << "Parsing succeeded:\n";
-		std::cout << test.geometry.size() << "\n";
-		for( Geometry* boop: test.geometry)
+		std::cout << geometry.size() << "\n";
+		for( Geometry* boop: geometry)
 		{
 			boop->writeOff(std::cout);
 			context.addGeometry(boop);
@@ -162,6 +164,9 @@ void load( const char* filename, RTContext& context )
         std::cout << "-------------------------\n";
     }
 	
+	geometry.clear();
+	shaders.clear();
+	shaderContext = NULL;
 	in.close();
 }
 } // namespace parser

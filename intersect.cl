@@ -53,7 +53,7 @@ static Result intersect(
 			if( nyligst.t > RT_DEFAULT_MIN && nyligst.t < closest.t )
 			{
 				closest = nyligst;
-				closest.shader = i;
+				closest.geo = i;
 				ifprint("REGULAR New closest at <%d, %d, %d>\n", type, index, i);
 			}
 			
@@ -80,16 +80,14 @@ static Result bvhintersect(
 		ifprint("\nEntering new id[%d]\n", id);
 		int type = context.bvh_ints[ id*6 + 0 ];
 		int index = context.bvh_ints[ id*6 + 1 ];
-		int shader = context.bvh_ints[ id*6 + 2 ];
-		int shaderIndex = context.bvh_ints[ id*6 + 3 ];
-		int next = context.bvh_ints[ id*6 + 4 ];
-		int failureLink = context.bvh_ints[ id*6 + 5 ];
+		int geo = context.bvh_ints[ id*6 + 2 ];
+		int next = context.bvh_ints[ id*6 + 3 ];
+		int failureLink = context.bvh_ints[ id*6 + 4 ];
 		
 		
 		ifprint("type: %d\n", type);
 		ifprint("index: %d\n", index);
-		ifprint("shader: %d\n", shader);
-		ifprint("shaderIndex: %d\n", shaderIndex);
+		ifprint("geo: %d\n", geo);
 		ifprint("next: %d\n", next);
 		ifprint("failureLink: %d\n", failureLink);
 		
@@ -145,8 +143,8 @@ static Result bvhintersect(
 				if( nyligst.t > RT_DEFAULT_MIN && nyligst.t < closest.t )
 				{
 					closest = nyligst;
-					closest.shader = shader;
-					ifprint("New closest at <%d, %d, %d>\n", type, index, shader);
+					closest.geo = geo;
+					ifprint("New closest at <%d, %d, %d>\n", type, index, geo);
 				}
 				
 				id = next;
